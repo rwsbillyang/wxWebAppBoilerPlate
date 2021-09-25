@@ -1,0 +1,19 @@
+{
+  "cwd": "/Users/bill/git/youke/frontEnd/wxWebAppBoilerplate",
+  "type": [
+    "web"
+  ],
+  "name": "WxWebAppBoilerplate",
+  "framework": "react",
+  "template": "blank",
+  "cssPreProcessor": false,
+  "bundler": "vite",
+  "theming": {
+    "customColor": false,
+    "color": "#007aff",
+    "darkTheme": false,
+    "iconFonts": true,
+    "fillBars": false
+  },
+  "customBuild": false
+}
