@@ -5,11 +5,6 @@
  */
  export const BrowserHistorySeparator = "#!"
 
- export const AppName = "WxWebapp Boilerplate"
- export const Version = "1.0"
-
- export const KeyPrefix = "/wxWebapp"  
-
  export const TextOK = "确定"
  export const TextCancel = "取消"
  export const TextBack = "返回"
@@ -17,3 +12,9 @@
  export const hasNavBar = () => true 
 
  export const isWxWork = true
+
+
+ 
+ export const AppName = "WxWebapp Boilerplate"
+ export const Version = "1.0"
+ export const KeyPrefix = "/wxWebapp"  

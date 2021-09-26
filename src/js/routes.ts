@@ -1,18 +1,29 @@
+import { Router } from 'framework7/types';
 
 import NotFoundPage from '@/pages/404';
 import About from '@/pages/About';
-import DemoWxWorkAdmin from '@/pages/demo/DemoWxWorkAdmin';
 import HomePage from '@/pages/Home';
+import ErrorPage from '@/pages/Error';
+
 
 import WxOAuthNotifyOa from '@/pages/user/WxOAuthNotifyOa';
 import WxOAuthLoginPage from '@/pages/user/WxOAuthLoginPage';
 import WxOAuthNotifyWork from '@/pages/user/WxOAuthNotifyWork';
-import { Router } from 'framework7/types';
+
+import Feedback from '@/pages/Feedback';
+import ContactKf from '@/pages/ContactKf';
+
 import { securedRoute } from './routesHelper';
-import ErrorPage from '@/pages/Error';
+
+
+import DemoWxWorkAdmin from '@/pages/demo/DemoWxWorkAdmin';
+
+
+
 
 const needSecureRoutes: Router.RouteParameters[] = [
-  securedRoute("demoWxAdmin", "/admin/demo/wxwork", DemoWxWorkAdmin)
+  securedRoute("demoWxAdmin", "/admin/demo/wxwork", DemoWxWorkAdmin),
+  securedRoute('feedback', '/admin/channel/feedback', Feedback),
 ]
 
 
@@ -48,6 +59,11 @@ const freeRoutes: Router.RouteParameters[] = [
     }
   },
   {
+    name: "contactKf",
+    path: '/channel/ContactKf',
+    component: ContactKf,
+  },
+  {
     name: "about",
     path: '/about',
     component: About,
@@ -55,7 +71,7 @@ const freeRoutes: Router.RouteParameters[] = [
   {
     name:'error',
     path: '/error',
-    component: ErrorPage,
+    component: ErrorPage, //若引用了错误的component，将导致构建route失败，从而影响路由，从而打不开页面
   },
   {
     name: "home",
@@ -69,8 +85,7 @@ const freeRoutes: Router.RouteParameters[] = [
   },
 ]
 
-const routes =  needSecureRoutes.concat(freeRoutes);
-export default routes
+export default needSecureRoutes.concat(freeRoutes);
 
 
 
