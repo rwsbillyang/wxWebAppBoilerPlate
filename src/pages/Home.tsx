@@ -9,8 +9,11 @@ import {
   Popover,
   List,
   ListItem,
+  f7,
 } from 'framework7-react';
 import { AppName, hasNavBar } from '@/config';
+import { evictAllCaches, StorageType } from '@/request/useCache';
+import { WxAuthHelper } from './user/wxOAuthHelper';
 
 const HomePage = () => (
   <Page name="home">
@@ -32,6 +35,21 @@ const HomePage = () => (
         <ListItem link="/about" popoverClose title="About" />
         <ListItem link="/error" popoverClose title="Error" routeProps={ {msg:"something wrong"} }/>
         <ListItem link="/404" popoverClose title="404" />
+        <ListItem link={`/contactKf`} popoverClose title="联系客服" />
+                <ListItem link={`/admin/feedback`} popoverClose title="意见反馈" />
+                    <ListItem link popoverClose onClick={() => {
+                        WxAuthHelper.onSignout()
+                        evictAllCaches(StorageType.OnlyLocalStorage)
+                        f7.toast.show({
+                            text: "即将退出...",
+                            on: {
+                                close: function () {
+                                    wx.closeWindow();
+                                },
+                            }
+                        })
+
+                    }} title="退出登录" />
       </List>
     </Popover>
   </Page>

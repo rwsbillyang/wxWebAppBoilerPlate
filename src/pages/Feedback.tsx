@@ -1,9 +1,10 @@
 import React, { SyntheticEvent, useState } from 'react';
 import { Button, f7, List, ListInput, Navbar, Page } from 'framework7-react';
-import { post } from '@/utils/myRequest';
-import { fetchDiscachely } from '@/utils/useCache';
+import { post } from '@/request/myRequest';
+import { fetchDiscachely } from '@/request/useCache';
 import { hasNavBar } from '@/config';
-import { WxWorkAuthHelper } from './wxWorkOAuthHelper';
+import { WxAuthHelper } from './user/wxOAuthHelper';
+
 
 export default (props: any) => {
     const [desc, setDesc] = useState<string>()
@@ -35,7 +36,7 @@ export default (props: any) => {
                     f7.dialog.alert("请写下您的宝贵意见，谢谢合作")
                     return false
                 }
-                fetchDiscachely(() => post('/api/feedback/admin/save', { desc, uId: WxWorkAuthHelper.getAuthBean()?.uId }),
+                fetchDiscachely(() => post('/api/feedback/admin/save', { desc, uId: WxAuthHelper.getAuthBean()?.uId }),
                     (data) => {
                         console.log(data)
                         f7.toast.show({

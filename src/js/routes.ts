@@ -23,7 +23,7 @@ import DemoWxWorkAdmin from '@/pages/demo/DemoWxWorkAdmin';
 
 const needSecureRoutes: Router.RouteParameters[] = [
   securedRoute("demoWxAdmin", "/admin/demo/wxwork", DemoWxWorkAdmin),
-  securedRoute('feedback', '/admin/channel/feedback', Feedback),
+  securedRoute('feedback', '/admin/feedback', Feedback),
 ]
 
 
@@ -60,7 +60,7 @@ const freeRoutes: Router.RouteParameters[] = [
   },
   {
     name: "contactKf",
-    path: '/channel/ContactKf',
+    path: '/contactKf',
     component: ContactKf,
   },
   {

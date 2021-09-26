@@ -1,6 +1,6 @@
 # WxWebAppBoilerplate
 
-
+Webapp boilerplate code for Wechat environment, written in typescript based on Framework7 react, support OAuth2 login
 
 ## Install Dependencies
 
