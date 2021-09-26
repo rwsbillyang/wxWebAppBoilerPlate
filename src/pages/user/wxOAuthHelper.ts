@@ -1,5 +1,6 @@
 import { KeyPrefix } from "@/config"
 import { getItem, saveItem } from "@/request/useCache"
+import { f7 } from "framework7-react"
 import { AuthBean, CorpParams, GuestOAuthBean } from "./authData"
 
 
@@ -53,6 +54,12 @@ export const WxAuthHelper = {
         const p = getItem(`${KeyPrefix}/corpParams`)
         if (p) return JSON.parse(p)
         else return undefined
+    },
+    //prefix: ?, &
+    getCorpParamsUrlQuery(prefix: string): string {
+        const p = getItem(`${KeyPrefix}/corpParams`)
+        if (p) return prefix + f7.utils.serializeObject(JSON.parse(p))
+        else return ''
     },
     getKey(): string {
         const p = WxAuthHelper.getCorpParams()

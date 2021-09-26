@@ -10,12 +10,13 @@ import {
 import routes from '../js/routes';
 import { AppName, BrowserHistorySeparator, TextCancel, TextOK } from '@/config';
 import { beforeLeave } from '@/js/routesHelper';
+import { Framework7Parameters } from 'framework7/types';
 
 const MyApp = () => {
 
 
   // Framework7 Parameters
-  const f7params = {
+  const f7params: Framework7Parameters = {
     name: AppName, // App name
       theme: 'auto', // Automatic theme detection
       dialog: {//https://framework7.io/docs/dialog.html#confirm

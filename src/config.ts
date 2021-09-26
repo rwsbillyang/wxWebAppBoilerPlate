@@ -13,7 +13,8 @@
 
  export const isWxWork = true
 
-
+ //wx0f92cbee09e231f9 : youke
+ export const AppId = "wx0f92cbee09e231f9"
  
  export const AppName = "WxWebapp Boilerplate"
  export const Version = "1.0"

@@ -6,7 +6,7 @@ import { hasNavBar } from '@/config';
 import { WxAuthHelper } from './user/wxOAuthHelper';
 
 
-export default (props: any) => {
+export default () => {
     const [desc, setDesc] = useState<string>()
     //useEffect(()=> { document.title = "意见反馈" }, [])
     return (

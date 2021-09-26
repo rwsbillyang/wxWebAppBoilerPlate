@@ -13,25 +13,48 @@ import WxOAuthNotifyWork from '@/pages/user/WxOAuthNotifyWork';
 import Feedback from '@/pages/Feedback';
 import ContactKf from '@/pages/ContactKf';
 
+import DemoWxWorkAdmin from '@/pages/demo/DemoWxWorkAdmin';
+import RoutableTabs from '@/pages/demo/RoutableTabs';
+import Tab1 from '@/pages/demo/Tab1';
+import Tab2 from '@/pages/demo/Tab2';
+import Tab3 from '@/pages/demo/Tab3';
+import Tab4 from '@/pages/demo/Tab4';
+
+import LoginPage from '@/pages/user/OALoginPage';
 import { securedRoute } from './routesHelper';
 
 
-import DemoWxWorkAdmin from '@/pages/demo/DemoWxWorkAdmin';
 
 
+const routes: Router.RouteParameters[] = [
+  {
+    path: '/admin/tab',
+    component: RoutableTabs,
+    tabs: [
+      securedRoute('tab1', '/tab1', Tab1),
+      securedRoute('tab2', '/tab2', Tab2),
+      securedRoute('tab3', '/tab3', Tab3),
+      securedRoute('tab4', '/tab4', Tab4),
+    ]
+  },
 
-
-const needSecureRoutes: Router.RouteParameters[] = [
-  securedRoute("demoWxAdmin", "/admin/demo/wxwork", DemoWxWorkAdmin),
   securedRoute('feedback', '/admin/feedback', Feedback),
-]
+  securedRoute("demoWxAdmin", "/admin/demo/wxwork", DemoWxWorkAdmin),
 
-
-const freeRoutes: Router.RouteParameters[] = [
   {
     name: 'login',
     path: '/wx/login',
     component: WxOAuthLoginPage,
+    options: {
+      history: false,
+      browserHistory: false,
+      clearPreviousHistory: true
+    }
+  },
+  {
+    name: 'login2',
+    path: '/wx/login2',
+    component: LoginPage,
     options: {
       history: false,
       browserHistory: false,
@@ -69,7 +92,7 @@ const freeRoutes: Router.RouteParameters[] = [
     component: About,
   },
   {
-    name:'error',
+    name: 'error',
     path: '/error',
     component: ErrorPage, //若引用了错误的component，将导致构建route失败，从而影响路由，从而打不开页面
   },
@@ -85,8 +108,7 @@ const freeRoutes: Router.RouteParameters[] = [
   },
 ]
 
-export default needSecureRoutes.concat(freeRoutes);
-
+export default routes
 
 
 

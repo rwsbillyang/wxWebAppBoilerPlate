@@ -24,7 +24,7 @@ const HomePage = () => (
 
     <Toolbar bottom>
       <Link href="/admin/demo/wxwork?corpId=wwb096af219dea3f1c&agentId=1000003">wxAdmin</Link>
-      <Link>Right Link</Link>
+      <Link href="/admin/tab/tab1?corpId=wwb096af219dea3f1c&agentId=1000003">tabPages</Link>
     </Toolbar>
 
     <Block strong>

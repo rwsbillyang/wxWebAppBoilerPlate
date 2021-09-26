@@ -1,17 +1,8 @@
-import React from 'react';
-import { Page, f7 } from 'framework7-react';
+import React, { useEffect } from 'react';
+import { Page, f7, Block } from 'framework7-react';
 import { getWithouAuth } from '@/request/myRequest';
-import { CorpParams } from './authData';
+import { CorpParams, OAuthInfo } from './authData';
 import { saveFrom, saveState } from './wxOAuthHelper';
-import { isWxWork } from '@/config';
-
-interface OAuthInfo {
-    appId: string, //corpId or suiteId
-    redirectUri: string,
-    scope: string,
-    state: string,
-    authorizeUrl: string
-}
 
 
 
@@ -23,7 +14,9 @@ interface OAuthInfo {
  * 
  * 下一步将执行到wxOAuthNotifyxx.tsx
  */
-const WxOAuthLoginPage: React.FC<{from: string}> = (props) => {
+const WxOAuthLoginPage = (props) => {
+
+    //对于RoutableTab，无pageInit等page事件
     const pageInit = () => {
         const from = props.from
         console.log("oauth login from " + from)
@@ -39,10 +32,8 @@ const WxOAuthLoginPage: React.FC<{from: string}> = (props) => {
         //故：故配置的入口页url中需要有正确的参数
         const query: CorpParams =  f7.utils.parseUrlQuery(props.from);
 
-        //TODO: 对于OA，还可以传递owner和openId
-        const url = isWxWork? '/api/wx/work/oauth/info?scope=1' : '/api/wx/oa/oauth/info'
-
-        getWithouAuth(url , query)
+    
+        getWithouAuth('/api/wx/work/oauth/info?scope=1' ,query)
             .then(function (res) {
                 f7.dialog.close()
                 const oauthInfo: OAuthInfo = res.data
@@ -62,9 +53,14 @@ const WxOAuthLoginPage: React.FC<{from: string}> = (props) => {
                 console.log(err.xhr + ", " + err.status + ": " + err.message)
             })
     }
+    useEffect(() =>{ 
+        pageInit() //对于RoutableTab，无pageInit等page事件
+    }, [])
+
 
     return (
-        <Page name="login" onPageInit={pageInit}>
+        <Page name="login">
+            <Block>请稍候...</Block>
         </Page>
     )
 }
