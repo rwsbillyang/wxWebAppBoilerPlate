@@ -1,0 +1,72 @@
+import React from 'react';
+import { Page, f7 } from 'framework7-react';
+import { getWithouAuth } from '@/request/myRequest';
+import { CorpParams } from './authData';
+import { saveFrom, saveState } from './wxOAuthHelper';
+import { isWxWork } from '@/config';
+
+interface OAuthInfo {
+    appId: string, //corpId or suiteId
+    redirectUri: string,
+    scope: string,
+    state: string,
+    authorizeUrl: string
+}
+
+
+
+
+/**
+ * 显示 登录中...
+ * 获取OauthInfo 然后重定向到用户授权页面，后端接到授权通知后再通知到前端认证结果，
+ * 前端再获取jwt token，再重定向到原请求页面 onPageInit={pageInit}
+ * 
+ * 下一步将执行到wxOAuthNotifyxx.tsx
+ */
+const WxOAuthLoginPage: React.FC<{from: string}> = (props) => {
+    const pageInit = () => {
+        const from = props.from
+        console.log("oauth login from " + from)
+        f7.dialog.preloader('登录中...')
+
+        //请求地址："/api/wx/work/oauth/info?scope=2" scope可选默认为2, scope： 0， 1， 2 分别对应：snsapi_base, snsapi_userinfo, snsapi_privateinfo
+        // 如果scope==2，非企业成员，直接提示出错
+        //- 内建单应用：`/api/wx/work/oauth/info`
+        //- 内建多应用：`/api/wx/work/oauth/info?corpId=${corpId}&agentId=${agentId}`
+        //- 第三方单应用：`/api/wx/work/oauth/info`
+        //- 第三方多应用：`/api/wx/work/oauth/info?suiteId=${suiteId}`
+        //为了提高前端兼容性，支持多应用、内建应用、第三方应用，将从from中遍历获取各个参数，传递给后端
+        //故：故配置的入口页url中需要有正确的参数
+        const query: CorpParams =  f7.utils.parseUrlQuery(props.from);
+
+        //TODO: 对于OA，还可以传递owner和openId
+        const url = isWxWork? '/api/wx/work/oauth/info?scope=1' : '/api/wx/oa/oauth/info'
+
+        getWithouAuth(url , query)
+            .then(function (res) {
+                f7.dialog.close()
+                const oauthInfo: OAuthInfo = res.data
+
+                saveState(oauthInfo.state)
+
+                //const from = f7.views.main.router.currentRoute.query["from"]
+                
+                if (from) saveFrom(from)
+                console.log("reidreact authorizeUrl="+oauthInfo.authorizeUrl)
+                window.location.href = oauthInfo.authorizeUrl
+            })
+            .catch(function (err) {
+                f7.dialog.close()
+                f7.dialog.alert(err.status + ": " + err.message)
+
+                console.log(err.xhr + ", " + err.status + ": " + err.message)
+            })
+    }
+
+    return (
+        <Page name="login" onPageInit={pageInit}>
+        </Page>
+    )
+}
+
+export default WxOAuthLoginPage

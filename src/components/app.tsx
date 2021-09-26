@@ -8,7 +8,8 @@ import {
 
 
 import routes from '../js/routes';
-import { AppName, BrowserHistorySeparator } from '@/config';
+import { AppName, BrowserHistorySeparator, TextCancel, TextOK } from '@/config';
+import { beforeLeave } from '@/js/routesHelper';
 
 const MyApp = () => {
 
@@ -19,8 +20,8 @@ const MyApp = () => {
       theme: 'auto', // Automatic theme detection
       dialog: {//https://framework7.io/docs/dialog.html#confirm
         title: AppName, // set default title for all dialog shortcuts
-        buttonOk: '确定', // change default "OK" button text
-        buttonCancel: "取消",
+        buttonOk: TextOK, // change default "OK" button text
+        buttonCancel: TextCancel,
       },
       toast: {
         closeTimeout: 1500,
@@ -32,7 +33,9 @@ const MyApp = () => {
       //   mdCenterTitle: true,
       //   hideOnPageScroll: true
       // },
-   
+      view: {
+        routesBeforeLeave: beforeLeave
+      },
       touch: {
         mdTouchRipple: false,
       },

@@ -20,7 +20,7 @@ const HomePage = () => (
     </Navbar> : null}
 
     <Toolbar bottom>
-      <Link>Left Link</Link>
+      <Link href="/admin/demo/wxwork?corpId=wwb096af219dea3f1c&agentId=1000003">wxAdmin</Link>
       <Link>Right Link</Link>
     </Toolbar>
 
@@ -30,6 +30,8 @@ const HomePage = () => (
     <Popover className="popover-menu">
       <List>
         <ListItem link="/about" popoverClose title="About" />
+        <ListItem link="/error" popoverClose title="Error" routeProps={ {msg:"something wrong"} }/>
+        <ListItem link="/404" popoverClose title="404" />
       </List>
     </Popover>
   </Page>
