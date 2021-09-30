@@ -25,7 +25,7 @@ const WxWorkOAuthNotify : React.FC = (props: any) => {
         const query = props.f7route.query
         const stateInSession = getState()
         
-        console.log(query)
+       // console.log(query)
 
         const state = query["state"]
         if (state !== stateInSession) {
@@ -110,7 +110,7 @@ const WxWorkOAuthNotify : React.FC = (props: any) => {
     }
     return (
         <Page name="workAuthNotify" onPageAfterIn={pageInit}>
-            <Block>{"currentRoute=" + f7.views.main.router.currentRoute.path }</Block>
+            {/* <Block>{"currentRoute=" + f7.views.main.router.currentRoute.path }</Block> */}
             <Block>{ status }</Block>
         </Page>
     )   

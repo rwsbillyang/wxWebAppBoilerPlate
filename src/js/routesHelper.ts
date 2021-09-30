@@ -5,7 +5,7 @@ import { ComponentFunction } from "framework7/types/modules/component/component"
 
 import { WxAuthHelper, WxGuestAuthHelper } from '@/pages/user/wxOAuthHelper';
 
-import { isWxWork } from '@/config';
+import { isWxWorkMode } from '@/config';
 
 
 import { BrowserHistorySeparator } from "@/config";
@@ -13,7 +13,7 @@ import { CorpParams } from "@/pages/user/authData";
 
 import ErrorPage from "@/pages/Error";
 import WxOAuthLoginPage from "@/pages/user/WxOAuthLoginPage";
-import LoginPage from "@/pages/user/OALoginPage";
+import OALoginPage from "@/pages/user/OALoginPage";
 
 
 
@@ -52,13 +52,13 @@ export function securedRoute(name: string, path: string, component: ComponentFun
                console.log("securedRoute: not logined, to LoginPage from " + ctx.to.url)
                  ctx.resolve({
                   // "component": MockLoginPage //isWxWork? WxOAuthLoginPage : LoginPage
-                  "component": isWxWork? WxOAuthLoginPage : LoginPage
+                  "component": isWxWorkMode? WxOAuthLoginPage : OALoginPage
                  }, {
                    "props": { from: ctx.to.url, needUserInfo: false, silentLogin: false }
                  })
              }
        } else {
-         if (WxGuestAuthHelper.isAuthenticated()) {
+         if (WxGuestAuthHelper.isAuthenticated() || WxAuthHelper.isAuthenticated()) {
              ctx.resolve({ "component": component })
          } else {
              //console.log("securedRoute: not login, jump to=" + ctx.to.url)
@@ -66,13 +66,13 @@ export function securedRoute(name: string, path: string, component: ComponentFun
  
              //只有newsDetail待定（根据用户配置确定），其它都不需要获取用户信息（关注时自动获取，其它情况不必要）
              if (ctx.to.name == "newsDetail") {
-               ctx.resolve({ "component": isWxWork? WxOAuthLoginPage : LoginPage
+               ctx.resolve({ "component": isWxWorkMode? WxOAuthLoginPage : OALoginPage
              }, {"props": { from: ctx.to.url,  owner: owner } })
              }else{
                if(WxGuestAuthHelper.isAuthenticated()){ //其它页面，登录要求只需有openid，无需有userinfo
                  ctx.resolve({ "component": component })
                }else{
-                 ctx.resolve({ "component": isWxWork? WxOAuthLoginPage : LoginPage
+                 ctx.resolve({ "component": isWxWorkMode? WxOAuthLoginPage : OALoginPage
                }, {"props": { from: ctx.to.url, needUserInfo: false, owner: owner } })
                }
              }

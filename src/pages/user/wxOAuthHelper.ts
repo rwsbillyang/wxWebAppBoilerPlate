@@ -88,13 +88,13 @@ export const WxAuthHelper = {
                 if (authBean.role[i] === 'admin')
                     return true
             }
-            console.log("not admin")
+            //console.log("not admin")
             return false
             //let flag = false
             //authBean.role.forEach(value => {if(value === 'admin') flag = true})
 
         } else {
-            console.log("authBean not admin")
+            //console.log("authBean not admin")
             return false
         }
     },
@@ -151,17 +151,7 @@ export const WxAuthHelper = {
     getHeaders(): {} | undefined {
         const authBean = WxAuthHelper.getAuthBean()
         if (authBean) {
-            let header: {
-                "Authorization"?: string | undefined
-                "X-Auth-uId"?: string | undefined
-                "X-Auth-oId"?: string | undefined
-                "X-Auth-unId"?: string | undefined
-                "X-Auth-UserId"?: string | undefined
-                "X-Auth-ExternalUserId"?: string | undefined
-                "X-Auth-SuiteId"?: string | undefined
-                "X-Auth-CorpId"?: string | undefined
-                "X-Auth-AgentId"?: number | undefined
-            } = {
+            let header: MyHeaders = {
                 // 'Content-Type': 'application/json',
                 // 'Accept': 'application/json',
                 "Authorization": 'Bearer ' + authBean.token
@@ -176,11 +166,35 @@ export const WxAuthHelper = {
             if (authBean.corpId) header["X-Auth-CorpId"] = authBean.corpId
             if (authBean.agentId) header["X-Auth-AgentId"] = authBean.agentId
             return header
+        }else{
+            const authBean2 = WxGuestAuthHelper.getAuthBean()
+            if(authBean2){
+                let header2: MyHeaders = {}
+                if (authBean2.openId) header2["X-Auth-oId"] = authBean2.openId
+                if (authBean2.unionId) header2["X-Auth-unId"] = authBean2.unionId
+                if (authBean2.userId) header2["X-Auth-UserId"] = authBean2.userId
+                if (authBean2.externalUserId) header2["X-Auth-ExternalUserId"] = authBean2.externalUserId
+                if (authBean2.suiteId) header2["X-Auth-SuiteId"] = authBean2.suiteId
+                if (authBean2.corpId) header2["X-Auth-CorpId"] = authBean2.corpId
+                if (authBean2.agentId) header2["X-Auth-AgentId"] = authBean2.agentId
+                return header2
         } else
             return undefined
+        }
     }
 }
 
+interface MyHeaders{
+    "Authorization"?: string | undefined
+    "X-Auth-uId"?: string | undefined
+    "X-Auth-oId"?: string | undefined
+    "X-Auth-unId"?: string | undefined
+    "X-Auth-UserId"?: string | undefined
+    "X-Auth-ExternalUserId"?: string | undefined
+    "X-Auth-SuiteId"?: string | undefined
+    "X-Auth-CorpId"?: string | undefined
+    "X-Auth-AgentId"?: number | undefined
+}
 
 export function saveState(state: string) {
     const key = `${KeyPrefix}/sys/state`

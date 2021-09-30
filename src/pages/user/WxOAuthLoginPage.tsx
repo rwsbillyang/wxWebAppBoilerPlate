@@ -30,10 +30,11 @@ const WxOAuthLoginPage = (props) => {
         //- 第三方多应用：`/api/wx/work/oauth/info?suiteId=${suiteId}`
         //为了提高前端兼容性，支持多应用、内建应用、第三方应用，将从from中遍历获取各个参数，传递给后端
         //故：故配置的入口页url中需要有正确的参数
-        const query: CorpParams =  f7.utils.parseUrlQuery(props.from);
+        const query: any =  f7.utils.parseUrlQuery(props.from);
+        const param: CorpParams = {appId: query?.appId, corpId: query?.corpId, agentId:query?.agentId}
 
     
-        getWithouAuth('/api/wx/work/oauth/info?scope=1' ,query)
+        getWithouAuth('/api/wx/work/oauth/info?scope=1', param)
             .then(function (res) {
                 f7.dialog.close()
                 const oauthInfo: OAuthInfo = res.data

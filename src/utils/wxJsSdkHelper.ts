@@ -5,7 +5,8 @@ import { useEffect, useState } from 'react'
 import { CODE, DataBox, getDataFromBox } from '@/request/databox'
 import { get } from "@/request/myRequest"
 import { getItem, saveItem } from '@/request/useCache'
-import { KeyPrefix } from '@/config';
+import { AppId, enableAgentConfig, isWxWorkMode, KeyPrefix } from '@/config';
+import { CorpParams } from '@/pages/user/authData';
 
 //分享接口仅激活的成员数超过200人且已经认证的企业才可在微信上调用。
 
@@ -38,6 +39,7 @@ const defaultJsApiList = [
     'onMenuShareWeibo',
     'onMenuShareQZone',
 
+    isWxWorkMode? 'onMenuShareWeChat': 'startRecord',
     // 'startRecord',
     // 'stopRecord',
     // 'onVoiceRecordEnd',
@@ -95,7 +97,8 @@ export interface WxInitResult {
 
 /**
  * react hooks版本 需要在设置了corpParams后执行
- * for Official account
+ * support Official account and wxWork
+ * https://open.work.weixin.qq.com/api/doc/10029
  * @param jsapiList 
  */
  export function useWxJsSdk(jsapiList: string[] = defaultJsApiList) {
@@ -109,10 +112,18 @@ export interface WxInitResult {
         } else if(status !== WxJsStatus.NetworkTypeLoaded){ 
             const params = WxAuthHelper.getCorpParams()
             const appId = params?.appId
-            if(!appId){
-                console.log("no appId="+appId)
-            }else{
-                get( "/api/wx/oa/jssdk/signature", {appId})
+            const corpId = params?.corpId
+            const agentId = params?.agentId
+            
+            if (isWxWorkMode && (!corpId || !agentId)) {
+                console.warn("no corpId=" + corpId + " or agentId=" + agentId)
+            }
+            if (!isWxWorkMode && !appId) {
+                console.warn("no appId=" + appId)
+            }
+
+            (isWxWorkMode? get("/api/wx/work/jssdk/signature", params)
+            :get("/api/wx/oa/jssdk/signature", { appId: appId || AppId }) )
                 .then(res => {
                     setStatus(WxJsStatus.SDKInitializing)
 
@@ -120,17 +131,11 @@ export interface WxInitResult {
                     if (box.code === CODE.OK) {
                         const data = getDataFromBox(box)
                         if (data) {
-                            wx.config({
-                                debug: false, // 开启调试模式,调用的所有api的返回值会在客户端alert出来，若要查看传入的参数，可以在pc端打开，参数信息会通过log打出，仅在pc端时才会打印。
-                                appId: data.appId,// 必填，企业微信的corpID
-                                timestamp: data.timestamp,// 必填，生成签名的时间戳
-                                nonceStr: data.nonceStr,// 必填，生成签名的随机串
-                                signature: data.signature, // 必填，签名，见 附录-JS-SDK使用权限签名算法
-                                jsApiList: jsapiList// 必填，需要使用的JS接口列表，凡是要调用的接口都需要传进来
-                            });
+                            onOauthData(data, params, corpId, agentId, jsapiList)
 
                             wx.ready(() => {
                                 setStatus(WxJsStatus.Ready)
+                                console.log("wx.ready...")
                                 wx.getNetworkType({
                                     success: function (res: any) {
                                         const networkType = res.networkType
@@ -175,14 +180,12 @@ export interface WxInitResult {
                         //saveItem(WxJsStatusKey, WxJsStatus.ServerResponseErr_NO_DATA.toString()) //注释掉，目的在于下次可以尝试
                         console.warn(msg)
                     }
-                })
-                .catch(err => {
+                }).catch(err => {
                     const msg = err.message
                     console.warn(msg)
                     setStatus(WxJsStatus.RequestErr)
                     //saveItem(WxJsStatusKey, WxJsStatus.RequestErr.toString()) //注释掉，目的在于下次可以尝试
                 })
-            }
         }else{
             //spa webapp, not need update signature for every url
             console.log("already nt="+networkType)
@@ -193,44 +196,52 @@ export interface WxInitResult {
 
 
 
-/**
- * react hooks版本 需要在设置了corpParams后执行
- * for wx work
- * @param jsapiList 
- */
-export function useWxWorkJsSdk(jsapiList: string[] = defaultJsApiList) {
-    const [status, setStatus] = useState(+(getItem(WxJsStatusKey) || '0'))
-    const [networkType, setNetworkType] = useState<string|undefined>(getItem(WxJsNtKey))
+//JS-SDK:  https://open.work.weixin.qq.com/api/doc/10029  
+function onOauthData(data: JsSignature, params?: CorpParams, corpId?: string, agentId?: number, jsapiList: string[] = defaultJsApiList) {
+    if (isWxWorkMode) {
+        wx.config({
+            beta: true,// 必须这么写，否则wx.invoke调用形式的jsapi会有问题
+            debug: false, // 开启调试模式,调用的所有api的返回值会在客户端alert出来，若要查看传入的参数，可以在pc端打开，参数信息会通过log打出，仅在pc端时才会打印。
+            appId: data.appId,// 必填，企业微信的corpID
+            timestamp: data.timestamp,// 必填，生成签名的时间戳
+            nonceStr: data.nonceStr,// 必填，生成签名的随机串
+            signature: data.signature, // 必填，签名，见 附录-JS-SDK使用权限签名算法
+            jsApiList: jsapiList,// 必填，需要使用的JS接口列表，凡是要调用的接口都需要传进来
+            success: function (res: any) {
+                console.log("wxwork wx.config successfully")
+                if(enableAgentConfig){
+                    injectAgentConfig(params, corpId, agentId, jsapiList)
+                }
+            },
+            fail: function (res: any) {
+                if (res.errMsg.indexOf('function not exist') > -1) {
+                    alert('版本过低请升级')
+                }
+            }
+        })
+    } else {
+        wx.config({
+            debug: false, // 开启调试模式,调用的所有api的返回值会在客户端alert出来，若要查看传入的参数，可以在pc端打开，参数信息会通过log打出，仅在pc端时才会打印。
+            appId: data.appId,// 必填，企业微信的corpID
+            timestamp: data.timestamp,// 必填，生成签名的时间戳
+            nonceStr: data.nonceStr,// 必填，生成签名的随机串
+            signature: data.signature, // 必填，签名，见 附录-JS-SDK使用权限签名算法
+            jsApiList: jsapiList// 必填，需要使用的JS接口列表，凡是要调用的接口都需要传进来
+        });
+    }
+}
 
-    useEffect(() => {
-        if (!isWeixin() &&  !isWxWork()) {
-            setStatus(WxJsStatus.NotWeixin)
-            console.log("not in wx")
-        } else if(status !== WxJsStatus.NetworkTypeLoaded){ 
-            const params = WxAuthHelper.getCorpParams()
-            const corpId = params?.corpId
-            const agentId = params?.agentId
-            if(!corpId || !agentId){
-                console.log("no corpId="+corpId+" or agentId="+agentId)
-            }else{
+function injectAgentConfig(params?: CorpParams, corpId?: string, agentId?: number, jsapiList: string[] = defaultJsApiList){
                 get("/api/wx/work/jssdk/signature", {...params,"type":"agent_config"})
                 .then(res => {
-                    setStatus(WxJsStatus.SDKInitializing)
+        //setStatus(WxJsStatus.SDKInitializing)
 
                     const box: DataBox<JsSignature> = res.data
                     if (box.code === CODE.OK) {
                         const data = getDataFromBox(box)
-                        if (data) {
-                            // wx.config({
-                            //     beta: true,// 必须这么写，否则wx.invoke调用形式的jsapi会有问题
-                            //     debug: true, // 开启调试模式,调用的所有api的返回值会在客户端alert出来，若要查看传入的参数，可以在pc端打开，参数信息会通过log打出，仅在pc端时才会打印。
-                            //     appId: data.appId,// 必填，企业微信的corpID
-                            //     timestamp: data.timestamp,// 必填，生成签名的时间戳
-                            //     nonceStr: data.nonceStr,// 必填，生成签名的随机串
-                            //     signature: data.signature, // 必填，签名，见 附录-JS-SDK使用权限签名算法
-                            //     jsApiList: jsapiList// 必填，需要使用的JS接口列表，凡是要调用的接口都需要传进来
-                            // })
+
                 
+            if (data) {
                               //https://work.weixin.qq.com/api/doc/90000/90136/90515
                             //config注入的是企业的身份与权限，而agentConfig注入的是应用的身份与权限。尤其是当调用者为第三方服务商时，
                             //通过config无法准确区分出调用者是哪个第三方应用，而在部分场景下，又必须严谨区分出第三方应用的身份，
@@ -255,67 +266,16 @@ export function useWxWorkJsSdk(jsapiList: string[] = defaultJsApiList) {
                                 }
                             });
 
-                            wx.ready(() => {
-                                setStatus(WxJsStatus.Ready)
-                                wx.getNetworkType({
-                                    success: function (res: any) {
-                                        const networkType = res.networkType
-                                        console.log("get networkType="+networkType)
-                                        setNetworkType(networkType)
-                                        if (networkType) saveItem(WxJsNtKey, networkType)
 
-                                        setStatus(WxJsStatus.NetworkTypeLoaded)
-                                        saveItem(WxJsStatusKey, WxJsStatus.NetworkTypeLoaded.toString())
-                                    },
-                                    fail: function () {
-                                        //不关心获取网络类型错误
-                                        setStatus(WxJsStatus.NetworkTypeLoadErr)
-                                        console.log("fail to get networkType")
                                     }
-                                })
 
-                                // if(!DEBUG){
-                                //     // 隐藏菜单
-                                //     wx.hideMenuItems({
-                                //         menuList: [ 'menuItem:refresh', 'menuItem:copyUrl', 'menuItem:openWithSafari'] // 要隐藏的菜单项
-                                //     });
-                                // }
-
-                            });
-
-                            wx.error((res: any) => {
-                                console.error('wx error', res);
-                                setStatus(WxJsStatus.WxInitErr)
-                                //saveItem(WxJsStatusKey, WxJsStatus.WxInitErr.toString()) //注释掉，目的在于下次可以尝试
-                            });
-
-                        } else {
-                            const msg = "data is null: " + JSON.stringify(box)
-                            console.warn(msg)
-                            setStatus(WxJsStatus.ServerResponseErr_NO_DATA)
-                            //saveItem(WxJsStatusKey, WxJsStatus.ServerResponseErr_NO_DATA.toString()) //注释掉，目的在于下次可以尝试
                         }
-                    } else {
-                        const msg = JSON.stringify(box)
-                        setStatus(WxJsStatus.ServerResponseErr_KO)
-                        //saveItem(WxJsStatusKey, WxJsStatus.ServerResponseErr_NO_DATA.toString()) //注释掉，目的在于下次可以尝试
-                        console.warn(msg)
-                    }
-                })
-                .catch(err => {
+    }).catch(err => {
                     const msg = err.message
                     console.warn(msg)
-                    setStatus(WxJsStatus.RequestErr)
-                    //saveItem(WxJsStatusKey, WxJsStatus.RequestErr.toString()) //注释掉，目的在于下次可以尝试
+        //setStatus(WxJsStatus.RequestErr)
                 })
             }
-        }else{
-            //spa webapp, not need update signature for every url
-            console.log("already nt="+networkType)
-        }
-    }, [])
-    return { status, networkType }
-}
 
 
 

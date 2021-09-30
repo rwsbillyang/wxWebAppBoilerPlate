@@ -58,6 +58,7 @@ export interface AuthBean extends GuestOAuthBean{
     role?: string[], //若为空，自动赋值 "user"
 
     avatar?: string,
+    nick?: string,
     qrCode?: string  
 }
 
