@@ -5,8 +5,9 @@ import { useEffect, useState } from 'react'
 import { CODE, DataBox, getDataFromBox } from '@/request/databox'
 import { get } from "@/request/myRequest"
 import { getItem, saveItem } from '@/request/useCache'
-import { AppId, enableAgentConfig, isWxWorkMode, KeyPrefix } from '@/config';
+import { AppId, AppKeyPrefix, enableAgentConfig, isWxWorkMode } from '@/config';
 import { CorpParams } from '@/pages/user/authData';
+import { f7 } from 'framework7-react';
 
 //分享接口仅激活的成员数超过200人且已经认证的企业才可在微信上调用。
 
@@ -18,15 +19,19 @@ export interface JsSignature {
     objectId: string //share or relay id
 }
 
+//const keyprefix = WxAuthHelper.getKeyPrefix()
+ const WxJsStatusKey = AppKeyPrefix + "/WxJsStatus"
+ const WxJsNtKey = AppKeyPrefix + "/WxJsNtKey"
 
-export const WxJsStatusKey = KeyPrefix + "/WxJsStatus"
-export const WxJsNtKey = KeyPrefix + "/WxJsNtKey"
-
-export function isWeixin() {
+export function isWeixinOrWxWork() {
     return /MicroMessenger/.test(navigator.userAgent);
 }
+export function isWeixin() {
+    const ua = window.navigator.userAgent;
+    return /MicroMessenger\/([\d\.]+)/i.test(ua) && !/wxwork/i.test(ua)
+}
 export function isWxWork() {
-    var ua = window.navigator.userAgent;
+    const ua = window.navigator.userAgent;
     return /MicroMessenger\/([\d\.]+)/i.test(ua) && /wxwork/i.test(ua)
 }
 
@@ -97,19 +102,29 @@ export interface WxInitResult {
 
 /**
  * react hooks版本 需要在设置了corpParams后执行
- * support Official account and wxWork
+ * support Official account and wxWork 企业微信中分享的内容有可能会
  * https://open.work.weixin.qq.com/api/doc/10029
  * @param jsapiList 
  */
  export function useWxJsSdk(jsapiList: string[] = defaultJsApiList) {
-    const [status, setStatus] = useState(+(getItem(WxJsStatusKey) || '0'))
+    const [status, setStatus] = useState(f7.data.wxJsStatus || WxJsStatus.None)
     const [networkType, setNetworkType] = useState<string|undefined>(getItem(WxJsNtKey))
 
     useEffect(() => {
-        if (!isWeixin() &&  !isWxWork()) {
+        if(!isWeixinOrWxWork())
+        {
             setStatus(WxJsStatus.NotWeixin)
+            f7.data.wxJsStatus = WxJsStatus.NotWeixin
+            //saveItem(WxJsStatusKey, WxJsStatus.NotWeixin.toString())
             console.log("not in wx")
-        } else if(status !== WxJsStatus.NetworkTypeLoaded){ 
+        }else {
+            getSignautre()
+        }
+    }, [])
+
+    const getSignautre = () => {
+        //避免重复请求
+        if (f7.data.wxJsStatus == undefined || f7.data.wxJsStatus <= WxJsStatus.None) { //若还处在初始状态，就进行签名验证，否则不验证。避免中途再次调用getSignautre
             const params = WxAuthHelper.getCorpParams()
             const appId = params?.appId
             const corpId = params?.corpId
@@ -121,12 +136,15 @@ export interface WxInitResult {
             if (!isWxWorkMode && !appId) {
                 console.warn("no appId=" + appId)
             }
+            console.log("to getSignautre...");
 
             (isWxWorkMode? get("/api/wx/work/jssdk/signature", params)
             :get("/api/wx/oa/jssdk/signature", { appId: appId || AppId }) )
                 .then(res => {
+                    f7.data.wxJsStatus = WxJsStatus.SDKInitializing
                     setStatus(WxJsStatus.SDKInitializing)
 
+                    //saveItem(WxJsStatusKey, WxJsStatus.SDKInitializing.toString())
                     const box: DataBox<JsSignature> = res.data
                     if (box.code === CODE.OK) {
                         const data = getDataFromBox(box)
@@ -134,7 +152,9 @@ export interface WxInitResult {
                             onOauthData(data, params, corpId, agentId, jsapiList)
 
                             wx.ready(() => {
+                                f7.data.wxJsStatus = WxJsStatus.Ready
                                 setStatus(WxJsStatus.Ready)
+                                //saveItem(WxJsStatusKey, WxJsStatus.Ready.toString())
                                 console.log("wx.ready...")
                                 wx.getNetworkType({
                                     success: function (res: any) {
@@ -143,12 +163,15 @@ export interface WxInitResult {
                                         setNetworkType(networkType)
                                         if (networkType) saveItem(WxJsNtKey, networkType)
 
+                                        f7.data.wxJsStatus = WxJsStatus.NetworkTypeLoaded
                                         setStatus(WxJsStatus.NetworkTypeLoaded)
-                                        saveItem(WxJsStatusKey, WxJsStatus.NetworkTypeLoaded.toString())
+                                        //saveItem(WxJsStatusKey, WxJsStatus.NetworkTypeLoaded.toString())
                                     },
                                     fail: function () {
                                         //不关心获取网络类型错误
+                                        f7.data.wxJsStatus = WxJsStatus.NetworkTypeLoadErr
                                         setStatus(WxJsStatus.NetworkTypeLoadErr)
+                                        //saveItem(WxJsStatusKey, WxJsStatus.NetworkTypeLoadErr.toString())
                                         console.log("fail to get networkType")
                                     }
                                 })
@@ -164,6 +187,7 @@ export interface WxInitResult {
 
                             wx.error((res: any) => {
                                 console.error('wx error', res);
+                                f7.data.wxJsStatus = WxJsStatus.WxInitErr
                                 setStatus(WxJsStatus.WxInitErr)
                                 //saveItem(WxJsStatusKey, WxJsStatus.WxInitErr.toString()) //注释掉，目的在于下次可以尝试
                             });
@@ -171,11 +195,13 @@ export interface WxInitResult {
                         } else {
                             const msg = "data is null: " + JSON.stringify(box)
                             console.warn(msg)
+                            f7.data.wxJsStatus = WxJsStatus.ServerResponseErr_NO_DATA
                             setStatus(WxJsStatus.ServerResponseErr_NO_DATA)
                             //saveItem(WxJsStatusKey, WxJsStatus.ServerResponseErr_NO_DATA.toString()) //注释掉，目的在于下次可以尝试
                         }
                     } else {
                         const msg = JSON.stringify(box)
+                        f7.data.wxJsStatus = WxJsStatus.ServerResponseErr_KO
                         setStatus(WxJsStatus.ServerResponseErr_KO)
                         //saveItem(WxJsStatusKey, WxJsStatus.ServerResponseErr_NO_DATA.toString()) //注释掉，目的在于下次可以尝试
                         console.warn(msg)
@@ -183,14 +209,15 @@ export interface WxInitResult {
                 }).catch(err => {
                     const msg = err.message
                     console.warn(msg)
+                    f7.data.wxJsStatus = WxJsStatus.RequestErr
                     setStatus(WxJsStatus.RequestErr)
                     //saveItem(WxJsStatusKey, WxJsStatus.RequestErr.toString()) //注释掉，目的在于下次可以尝试
                 })
         }else{
             //spa webapp, not need update signature for every url
-            console.log("already nt="+networkType)
+            console.log("status="+status+",ignore getSignature,  nt=" + networkType)
         }
-    }, [])
+    }
     return { status, networkType }
 }
 
@@ -441,4 +468,30 @@ export const showUserDetail = (id: string, messageType: string) => {
         console.warn("not support type="+type)
     }
     
+}
+
+
+
+export function loadJS(url: string, callback?: () => void) {
+    const script: HTMLScriptElement = document.createElement('script')
+    const fn = callback || function () { };
+    script.type = 'text/javascript';
+
+    //IE
+    // if (script.readyState) {
+    //     script.onreadystatechange = function () {
+    //         if (script.readyState == 'loaded' || script.readyState == 'complete') {
+    //             script.onreadystatechange = null;
+    //             fn();
+    //         }
+    //     };
+    // } else {
+        //其他浏览器
+        script.onload = function () {
+            console.log("load done: " + url)
+            fn();
+        };
+   // }
+    script.src = url;
+    document.getElementsByTagName('head')[0].appendChild(script);
 }

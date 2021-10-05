@@ -65,7 +65,7 @@ const LoginPage: React.FC<LoginParam> = (props: any) => {
                 const oauthInfo: OAuthInfo = res.data
                 if(openId && !oauthInfo.needUseInfo){ //若已有openId，且无需获取userInfo，直接打开页面
                     //这时需要设置hasUserInfo，否则又回到打开newsDetail的链接，一直无限循环下去
-                    WxGuestAuthHelper.onAuthenticated({ appId: appId, openId: openId, hasUserInfo: true})
+                    WxGuestAuthHelper.onAuthenticated({ appId: appId, openId1: openId, hasUserInfo: true})
                     window.location.href = from //props.f7router.navigate(from)
                 }else{
                     saveState(oauthInfo.state)
@@ -90,7 +90,7 @@ const LoginPage: React.FC<LoginParam> = (props: any) => {
                 console.warn("owner is undefined, are you sure?")
                 directlyRedirect(true) //没有owner情况，都认为需要获取userinfo
             }else{
-                const guestOpenId = WxGuestAuthHelper.getAuthBean()?.openId
+                const guestOpenId = WxGuestAuthHelper.getAuthBean()?.openId1
                 if(guestOpenId){//已经经过第一步认证，即有openId，但无头像和昵称，直接进入根据后端判定是否进入第二步
                     getOauthInfo(guestOpenId) 
                 }else{//全新用户，还要从step1开始进行认证，即先获取openId，后端通知前端是否进行第二步获取用户信息
@@ -100,7 +100,7 @@ const LoginPage: React.FC<LoginParam> = (props: any) => {
         }else{
             if(silentLogin){//静默登录
                 //const f7router = f7.views.main.router
-                const openId = WxAuthHelper.getAuthBean()?.openId
+                const openId = WxAuthHelper.getAuthBean()?.openId1
                 if(!openId){
                     directlyRedirect(needUserInfo) //无openId
                 }else{

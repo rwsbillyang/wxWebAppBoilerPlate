@@ -11,11 +11,14 @@
 
  export const hasNavBar = () => true 
 
- export const isWxWork = true
+ export const isWxWorkMode = true
+ export const enableAgentConfig = false //企业微信是否注入agentConfig
 
- //wx0f92cbee09e231f9 : youke
- export const AppId = "wx0f92cbee09e231f9"
+
  
  export const AppName = "WxWebapp Boilerplate"
  export const Version = "1.0"
- export const KeyPrefix = "/wxWebapp"  
+ export const AppKeyPrefix = "/wxWebapp"  
+
+ //wx0f92cbee09e231f9 : youke
+ export const AppId = "wx0f92cbee09e231f9"

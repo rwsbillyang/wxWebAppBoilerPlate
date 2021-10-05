@@ -50,7 +50,7 @@ const WxWorkOAuthNotify : React.FC = (props: any) => {
                 
                 //此时的agentId可能为空
                 const initialAuthBean: GuestOAuthBean = {
-                    corpId, agentId, suiteId, userId, externalUserId, openId
+                    corpId, agentId, suiteId, userId, externalUserId, openId2: openId
                 }
                 WxGuestAuthHelper.onAuthenticated(initialAuthBean)
 
@@ -65,7 +65,7 @@ const WxWorkOAuthNotify : React.FC = (props: any) => {
                             if(!corpId){
                                 setStatus("缺少参数：corpId")
                             }else{
-                                getWithouAuth(`/api/wx/work/account/login`, {userId, corpId, agentId, openId, externalUserId, deviceId})
+                                getWithouAuth(`/api/wx/work/account/login`, {userId, corpId, agentId, openId2: openId, externalUserId, deviceId})
                                     .then(function (res) {
                                         //f7.dialog.close()
                                         const box: DataBox<AuthBean> = res.data

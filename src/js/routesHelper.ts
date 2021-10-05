@@ -143,6 +143,6 @@ export function needAdmin(ctx: Router.RouteCallbackCtx) {
   } else {
     //console.log("not login, needAdmin: jump to: " + ctx.to.path + ",from=" + ctx.from.url)
     ctx.reject()
-    ctx.router.navigate({ name: 'login' }, { props: { from: ctx.to.url } });
+    ctx.router.navigate({ name: isWxWorkMode? 'login' : 'login2'}, { props: { from: ctx.to.url } });
   }
 }
