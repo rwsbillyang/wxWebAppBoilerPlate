@@ -2,10 +2,11 @@ import React, { useState } from 'react';
 import { Page, Block, Link, f7 } from 'framework7-react';
 
 
-import { getFrom, getState, WxGuestAuthHelper } from './wxOAuthHelper';
-import { authorizeUrl } from './OALoginPage';
-import { GuestOAuthBean } from './authData';
+import { getFrom, getState, WxGuestAuthHelper } from './WxOauthHelper';
+import { authorizeUrl } from './WxOauthLoginPageOA';
+import { GuestOAuthBean, login } from './AuthData';
 import { AppId } from '@/config';
+
 
 /**
  * 接到后端通知后，出错则显示错误信息；正确则进行登录(若需admin)获取jwtToken，最后进行跳转
@@ -42,26 +43,25 @@ export default (props: any) => {
             return false
         }
         //必须是系统注册用户
-        // login(openId, 
-        //     ()=>props.f7router.navigate(from), 
-        //     ()=> props.f7router.navigate("/u/register", { props: { from } }),
-        //     (msg)=> setMsg("登录失败：" + msg)
-        // )
+        login(openId, 
+            ()=> f7.views.main.router.navigate(from), 
+            //()=> f7.views.main.router.navigate("/u/register", { props: { from } }),
+            ()=>{ window.location.href = "/u/register?from="+from }, //使用router.navigate容易导致有的手机中注册页面中checkbox和a标签无法点击,原因不明
+            (msg)=> setMsg("登录失败：" + msg)
+            )
             
-        return false
+            return false
     }
+
 
     const pageInit = () => {
         const query = props.f7route.query
         const appId = query["appId"] || AppId
         const step = query["step"]
         if(step === '1'){
-        const stateInSession = getState()
-        
-   
-
-        const state = query["state"]
-        if (state !== stateInSession) {
+            const stateInSession = getState()
+            const state = query["state"]
+            if (state !== stateInSession) {
                 setMsg("页面可能已过期，可直接关闭")
                 console.warn("state=" + state + ", stateInSession=" + stateInSession)
                 return false
@@ -72,15 +72,14 @@ export default (props: any) => {
             if (needUserInfo === '1') {
                 //进行第二步认证：目的在于获取用户信息
                 window.location.href = authorizeUrl(appId, true)
-        } else {
+            }else{
                 if (query["code"] !== 'OK') {
                     const err = query["msg"]
                     setMsg(err)
                     console.warn(err)
                     return false
                 }
-                
- 
+            
                 const openId = query["openId"]
                 if (!openId) {
                     setMsg("缺少参数：openId")
@@ -89,13 +88,13 @@ export default (props: any) => {
                 }
                 const guestAuthBean: GuestOAuthBean = {appId, openId1: openId }
                 WxGuestAuthHelper.onAuthenticated(guestAuthBean)
-                
+
                 maybeLoginAndGoBack(openId)
-                }
+            }
         }else if(step === '2'){
             const stateInSession = getState()
             const state = query["state"]
-
+            
             //保留该校验，目的在于回退时阻止继续进行下去
             if (state !== stateInSession) {
                 setMsg("页面可能已过期，可直接关闭")
@@ -107,30 +106,29 @@ export default (props: any) => {
             if (query["code"] !== 'OK') {
                 const err = query["msg"]
                 console.warn(err)
-                                            }
+            }
+
             //const unionId = query["unionId"]
             const openId = query["openId"]
             if (!openId) {
                 console.warn("缺少参数：openId")
-                                        }else{
+            }else{
                 const guestAuthBean: GuestOAuthBean = {appId, openId1: openId, hasUserInfo: true}
                 WxGuestAuthHelper.onAuthenticated(guestAuthBean)
-                                        } 
-
-                                
+            }
+            
             maybeLoginAndGoBack(openId)
-                        } else {
+        }else{
             setMsg("parameter error: step="+step)
-                        }
+        }
+        
         return false
-                    }
+    }
 
     return (
         <Page name="authNotify" onPageInit={pageInit}>
             {msg && <Block className="text-align-center">{msg} <br/>
-            <Link href="/u/contactKf">联系客服</Link></Block>}
+            <Link href="/contactKf">联系客服</Link></Block>}
         </Page>
-    )   
+    )
 }
-
-

@@ -3,10 +3,10 @@ import { Button, f7, List, ListInput, Navbar, Page } from 'framework7-react';
 import { post } from '@/request/myRequest';
 import { fetchDiscachely } from '@/request/useCache';
 import { hasNavBar } from '@/config';
-import { WxAuthHelper } from './user/wxOAuthHelper';
+import { WxAuthHelper } from '../user/WxOauthHelper';
 
 
-export default () => {
+export default (props: any) => {
     const [desc, setDesc] = useState<string>()
     //useEffect(()=> { document.title = "意见反馈" }, [])
     return (

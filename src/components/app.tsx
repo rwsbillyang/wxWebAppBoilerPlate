@@ -60,11 +60,11 @@ const MyApp = () => {
     f7ready((f7) => {
       f7.data = {} //存放wxjsSDK初始化状态，以及编辑状态
       console.log("f7ready!")
-      const ua = window.navigator.userAgent;
-      if(/Android/i.test(ua) && /ColorScheme\/Dark/i.test(ua)){
-        console.log("enable DarkTheme!")
-        f7.darkTheme = true
-      }
+      // const ua = window.navigator.userAgent;
+      // if(/Android/i.test(ua) && /ColorScheme\/Dark/i.test(ua)){
+      //   console.log("enable DarkTheme!")
+      //   f7.darkTheme = true
+      // }
 
       // for(let i = 0; i < routes.length; i++){
       //   console.log(`routes[${i}]: ${routes[i].name}, ${routes[i].path}`)

@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { Page, Block, f7 } from 'framework7-react';
-import { getWithouAuth } from '@/request/myRequest';
+import { postWithouAuth } from '@/request/myRequest';
 import { CODE, DataBox, getDataFromBox } from '@/request/databox';
-import { getFrom, getState, WxAuthHelper, WxGuestAuthHelper } from './wxOAuthHelper';
-import { AuthBean, GuestOAuthBean } from './authData';
+import { getFrom, getState, WxAuthHelper, WxGuestAuthHelper } from './WxOauthHelper';
+import { AuthBean, GuestOAuthBean } from './AuthData';
+import { DEBUG } from '@/config';
 
 /**
  * OAuthLogin成功后的通知
@@ -15,12 +16,12 @@ import { AuthBean, GuestOAuthBean } from './authData';
  * "$notifyWebAppUrl?state=$state&code=KO&msg=${res.errCode}:${res.errMsg}
  * $oauthNotifyWebAppUrl?state=$state&code=OK&userId={userId?}&corpId=CORPID&agentId=AGENTID&externalUserId=${externalUserId?}&&openId=${openId?}
  */
-const WxWorkOAuthNotify : React.FC = (props: any) => {
+const WxOauthNotifyWork : React.FC = (props: any) => {
     const [status, setStatus] = useState("请稍候...")
-    console.log("WxWorkOAuthNotify...")
+    if(DEBUG)console.log("WxWorkOAuthNotify...")
 
     const pageInit = () => {
-        console.log("WxWorkOAuthNotify pageInit... url=" + props.f7route.url)
+        if(DEBUG) console.log("WxWorkOAuthNotify pageInit... url=" + props.f7route.url)
         //f7.dialog.preloader('登录中...')
         const query = props.f7route.query
         const stateInSession = getState()
@@ -50,7 +51,7 @@ const WxWorkOAuthNotify : React.FC = (props: any) => {
                 
                 //此时的agentId可能为空
                 const initialAuthBean: GuestOAuthBean = {
-                    corpId, agentId, suiteId, userId, externalUserId, openId2: openId
+                    corpId, agentId, suiteId, userId, externalUserId, openId2: openId,deviceId
                 }
                 WxGuestAuthHelper.onAuthenticated(initialAuthBean)
 
@@ -65,7 +66,8 @@ const WxWorkOAuthNotify : React.FC = (props: any) => {
                             if(!corpId){
                                 setStatus("缺少参数：corpId")
                             }else{
-                                getWithouAuth(`/api/wx/work/account/login`, {userId, corpId, agentId, openId2: openId, externalUserId, deviceId})
+                                console.log("login WxWorkOAuthNotify...")
+                                postWithouAuth(`/api/wx/work/account/login`, initialAuthBean)
                                     .then(function (res) {
                                         //f7.dialog.close()
                                         const box: DataBox<AuthBean> = res.data
@@ -74,12 +76,14 @@ const WxWorkOAuthNotify : React.FC = (props: any) => {
                                         {
                                             if(authBean){
                                                 WxAuthHelper.onAuthenticated(authBean)
-                                                //configWxWork(authBean.corpId, authBean.agentId)
-
-                                                props.f7router.navigate(from)  //window.location.href = from 
+                                                f7.views.main.router.navigate(from)  //window.location.href = from 
                                             }else{
                                                 setStatus("异常：未获取到登录信息")
                                             }
+                                        }else if (box.code == CODE.NewUser) {
+                                            window.location.href = "/u/register?from="+from
+                                            //使用router.navigate容易导致有的手机中注册页面中checkbox和a标签无法点击,原因不明
+                                            //f7.views.main.router.navigate("/u/register",{ props: {from: from }})
                                         }else if(box.code === "SelfAuth"){
                                             //成员自己授权使用，引导用户授权应用
                                             setStatus("请自行安装应用")
@@ -116,4 +120,4 @@ const WxWorkOAuthNotify : React.FC = (props: any) => {
     )   
 }
 
-export default WxWorkOAuthNotify
+export default WxOauthNotifyWork

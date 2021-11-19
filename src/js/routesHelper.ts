@@ -3,18 +3,17 @@ import { f7 } from "framework7-react";
 import { Router } from "framework7/types";
 import { ComponentFunction } from "framework7/types/modules/component/component";
 
-import { WxAuthHelper, WxGuestAuthHelper } from '@/pages/user/wxOAuthHelper';
-
-import { isWxWorkMode } from '@/config';
 
 
-import { BrowserHistorySeparator } from "@/config";
-import { CorpParams } from "@/pages/user/authData";
 
-import ErrorPage from "@/pages/Error";
-import WxOAuthLoginPage from "@/pages/user/WxOAuthLoginPage";
-import OALoginPage from "@/pages/user/OALoginPage";
+import { BrowserHistorySeparator, DEBUG } from "@/config";
+import ErrorPage from "@/pages/auxiliary/Error";
 
+import { CorpParams } from "@/pages/user/AuthData";
+import WxOauthLoginPageWork from "@/pages/user/WxOauthLoginPageWork";
+import WxOauthLoginPageOA from "@/pages/user/WxOauthLoginPageOA";
+import { WebAppHelper } from "@/pages/user/WebAppHelper";
+import { WxAuthHelper, WxGuestAuthHelper } from '@/pages/user/WxOauthHelper';
 
 
 
@@ -37,22 +36,24 @@ export function beforeLeave(ctx: Router.RouteCallbackCtx) {
 export function securedRoute(name: string, path: string, component: ComponentFunction | Function | object) {
   // function securedRoute(name, path, component) {
    return {
-     name, path, id: name,
-     //async(ctx: Router.RouteCallbackCtx) {
-       async(ctx) {
+    name, path, id: name, async(ctx: Router.RouteCallbackCtx) { checkAdmin(ctx, component) }
+  }
+}
  
+function checkAdmin(ctx: Router.RouteCallbackCtx, component: ComponentFunction | Function | object) {
+  if(DEBUG) console.log("securedRoute checkAdmin call checkAndSetCorpParams")
        checkAndSetCorpParams(ctx, ctx.to.url)
  
+  const isWxWorkApp = WebAppHelper.isWxWorkApp()
        const isNeedAdmin = ctx.to.path.indexOf("/admin/") >= 0
        if (isNeedAdmin) {
              const isAuthenticated = WxAuthHelper.isAuthenticated()
              if (isAuthenticated) {
                  ctx.resolve({ "component": component })
              } else {
-               console.log("securedRoute: not logined, to LoginPage from " + ctx.to.url)
+      if(DEBUG) console.log("securedRoute checkAdmin: not logined, to LoginPage from " + ctx.to.url)
                  ctx.resolve({
-                  // "component": MockLoginPage //isWxWork? WxOAuthLoginPage : LoginPage
-                  "component": isWxWorkMode? WxOAuthLoginPage : OALoginPage
+        "component": isWxWorkApp ? WxOauthLoginPageWork : WxOauthLoginPageOA
                  }, {
                    "props": { from: ctx.to.url, needUserInfo: false, silentLogin: false }
                  })
@@ -61,88 +62,101 @@ export function securedRoute(name: string, path: string, component: ComponentFun
          if (WxGuestAuthHelper.isAuthenticated() || WxAuthHelper.isAuthenticated()) {
              ctx.resolve({ "component": component })
          } else {
-             //console.log("securedRoute: not login, jump to=" + ctx.to.url)
+      if(DEBUG) console.log("securedRoute: not login, jump to=" + ctx.to.url)
              let owner = ctx.to.params["uId"]//用于查询后端文章属主需不需要获取用户信息
  
              //只有newsDetail待定（根据用户配置确定），其它都不需要获取用户信息（关注时自动获取，其它情况不必要）
-             if (ctx.to.name == "newsDetail") {
-               ctx.resolve({ "component": isWxWorkMode? WxOAuthLoginPage : OALoginPage
-             }, {"props": { from: ctx.to.url,  owner: owner } })
-             }else{
-               if(WxGuestAuthHelper.isAuthenticated()){ //其它页面，登录要求只需有openid，无需有userinfo
-                 ctx.resolve({ "component": component })
-               }else{
-                 ctx.resolve({ "component": isWxWorkMode? WxOAuthLoginPage : OALoginPage
-               }, {"props": { from: ctx.to.url, needUserInfo: false, owner: owner } })
-               }
-             }
-         }
-       }
+      ctx.resolve({
+        "component": isWxWorkApp ? WxOauthLoginPageWork : WxOauthLoginPageOA
+      }, { "props": { from: ctx.to.url, needUserInfo: ctx.to.name.indexOf("newsDetail")>=0? undefined: false, owner: owner } })
      }
    }
  }
  
 
-//https://forum.framework7.io/t/issue-with-f7-vue-routes-component-async-at-same-time-doesnt-works/4469/8
-export function securedRoute2(name: string, path: string, component: ComponentFunction | Function | object) {
-  return {
-    name, path, id: name,
-    async(ctx: Router.RouteCallbackCtx) {
 
+
+export function needAdmin(ctx: Router.RouteCallbackCtx) {
+  if(DEBUG) console.log("beforeEnter needAdmin")
+  //若还没有CorpParams，则解析url参数，设置它；若已存在则忽略
       checkAndSetCorpParams(ctx, ctx.to.url)
 
+  const isWxWorkApp = WebAppHelper.isWxWorkApp()
       const isNeedAdmin = ctx.to.path.indexOf("/admin/") >= 0
       if (isNeedAdmin) {
-        const isLogined = WxAuthHelper.isAuthenticated()
-        if (isLogined) {
-          console.log("securedRoute: admin logined, jump to " + ctx.to.url)
-          ctx.resolve({ "component": component })
+    const isAuthenticated = WxAuthHelper.isAuthenticated()
+    if (isAuthenticated) {
+      ctx.resolve()
         } else {
-          console.log("securedRoute: not logined, jump to WxOAuthLoginPage from " + ctx.to.url)
-          ctx.resolve({
-            "component": WxOAuthLoginPage
-          }, {
-            "props": { from: ctx.to.url }
-          })
+      ctx.reject()
+      //admin情况下，没有指定owner，也没指定openId，WxOauthLoginPageOA直接跳转到获取用户信息的授权认证
+      ctx.router.navigate({ name: isWxWorkApp ? 'login' : 'login2' }, { props: { from: ctx.to.url } });
         }
       } else {
-        if (WxGuestAuthHelper.isAuthenticated()) {
-          console.log("securedRoute: guest logined, jump to " + ctx.to.url)
-          ctx.resolve({ "component": component })
+    if (WxGuestAuthHelper.isAuthenticated() || WxAuthHelper.isAuthenticated()) {
+      ctx.resolve()
         } else {
-          console.log("securedRoute: guest not login, from " + ctx.to.url)
-          ctx.resolve({ "component": WxOAuthLoginPage }, { "props": { from: ctx.to.url } })
-        }
-      }
+      if(DEBUG) console.log("beforeEnter needAdmin: not login, jump to=" + ctx.to.url)
+      let owner = ctx.to.params["uId"]//用于查询后端文章属主需不需要获取用户信息
+
+      ctx.reject()
+      //非admin页面：只有newsDetail待定（传递了ownerOpenId和未定的needUserInfo，WxOauthLoginPageOA将请求后端根据用户配置确定），其它都不需要获取用户信息（关注时自动获取，其它情况不必要）
+      ctx.router.navigate({ name: isWxWorkApp ? 'login' : 'login2' }, { props: { from: ctx.to.url, needUserInfo: ctx.to.name.indexOf("newsDetail")>=0 ? undefined : false, owner: owner } });
     }
   }
 }
 
 export function checkAndSetCorpParams(ctx: Router.RouteCallbackCtx, toUrl: string){
+  if(DEBUG) console.log("checkAndSetCorpParams call getCorpParams! toUrl="+toUrl)
       //若还没有CorpParams，则解析url参数，设置它；若已存在则忽略
-      const p = WxAuthHelper.getCorpParams()
+  const p = WebAppHelper.getCorpParams()
       if (!p) {
         const query: any = f7.utils.parseUrlQuery(toUrl)
-        const params: CorpParams = { corpId: query.corpId, agentId: query.agentId, suiteId: query.suiteId }
-        if (params) WxAuthHelper.setCorpParams(params)
-        else {
-          console.log("no CorpParams in url and sessionStorage")
-          ctx.resolve({ "component": ErrorPage }, { "props": { msg: "no CorpParams in url" } })
+    const params: CorpParams = { corpId: query.corpId, agentId: query.agentId, suiteId: query.suiteId, appId: query.appId }
+
+    if ((!query.corpId || !query.agentId) && !query.suiteId && !query.appId){
+      if(DEBUG) console.log("no CorpParams in url and sessionStorage:, toUrl="+toUrl)
+      ctx.resolve({ "component": ErrorPage }, { "props": { msg: "no CorpParams in toUrl="+toUrl } })
+    }else{
+        WebAppHelper.setCorpParams(params)
+        if(DEBUG) console.log("setCorpParams done")
         }
       }
 }
 
-export function needAdmin(ctx: Router.RouteCallbackCtx) {
-  const isAdmin = ctx.to.path.indexOf("/admin/") >= 0
 
-  //若还没有CorpParams，则解析url参数，设置它；若已存在则忽略
-  checkAndSetCorpParams(ctx, ctx.to.url)
 
-  if (isAdmin ? WxAuthHelper.isAuthenticated() : WxGuestAuthHelper.isAuthenticated()) {
-    ctx.resolve()
-  } else {
-    //console.log("not login, needAdmin: jump to: " + ctx.to.path + ",from=" + ctx.from.url)
-    ctx.reject()
-    ctx.router.navigate({ name: isWxWorkMode? 'login' : 'login2'}, { props: { from: ctx.to.url } });
-  }
-}
+//https://forum.framework7.io/t/issue-with-f7-vue-routes-component-async-at-same-time-doesnt-works/4469/8
+// export function securedRoute2(name: string, path: string, component: ComponentFunction | Function | object) {
+//   return {
+//     name, path, id: name,
+//     async(ctx: Router.RouteCallbackCtx) {
+
+//       checkAndSetCorpParams(ctx, ctx.to.url)
+
+//       const isNeedAdmin = ctx.to.path.indexOf("/admin/") >= 0
+//       if (isNeedAdmin) {
+//         const isLogined = WxAuthHelper.isAuthenticated()
+//         if (isLogined) {
+//           //console.log("securedRoute: admin logined, jump to " + ctx.to.url)
+//           ctx.resolve({ "component": component })
+//         } else {
+//           //console.log("securedRoute: not logined, jump to WxOAuthLoginPage from " + ctx.to.url)
+//           ctx.resolve({
+//             "component": WxOauthLoginPageWork
+//           }, {
+//             "props": { from: ctx.to.url }
+//           })
+//         }
+//       } else {
+//         if (WxGuestAuthHelper.isAuthenticated()) {
+//           //console.log("securedRoute: guest logined, jump to " + ctx.to.url)
+//           ctx.resolve({ "component": component })
+//         } else {
+//           //console.log("securedRoute: guest not login, from " + ctx.to.url)
+//           ctx.resolve({ "component": WxOauthLoginPageWork }, { "props": { from: ctx.to.url } })
+//         }
+//       }
+//     }
+//   }
+// }

@@ -1,29 +1,26 @@
 import { Router } from 'framework7/types';
 
-import NotFoundPage from '@/pages/404';
-import About from '@/pages/About';
+import NotFoundPage from '@/pages/auxiliary/404';
+import About from '@/pages/auxiliary/About';
 import HomePage from '@/pages/Home';
-import ErrorPage from '@/pages/Error';
+import ErrorPage from '@/pages/auxiliary/Error';
 
+import Feedback from '@/pages/auxiliary/Feedback';
+import ContactKf from '@/pages/auxiliary/ContactKf';
 
-import WxOAuthNotifyOa from '@/pages/user/WxOAuthNotifyOa';
-import WxOAuthLoginPage from '@/pages/user/WxOAuthLoginPage';
-import WxOAuthNotifyWork from '@/pages/user/WxOAuthNotifyWork';
+import { securedRoute } from './routesHelper';
+import WxOauthLoginPageWork from '@/pages/user/WxOauthLoginPageWork';
 
-import Feedback from '@/pages/Feedback';
-import ContactKf from '@/pages/ContactKf';
+import RoutableTabs from '@/pages/demo/RoutableTabs';
+import WxOauthLoginPageOA from '@/pages/user/WxOauthLoginPageOA';
+import WxOauthNotifyWork from '@/pages/user/WxOauthNotifyWork';
 
 import DemoWxWorkAdmin from '@/pages/demo/DemoWxWorkAdmin';
-import RoutableTabs from '@/pages/demo/RoutableTabs';
 import Tab1 from '@/pages/demo/Tab1';
 import Tab2 from '@/pages/demo/Tab2';
 import Tab3 from '@/pages/demo/Tab3';
 import Tab4 from '@/pages/demo/Tab4';
-
-import LoginPage from '@/pages/user/OALoginPage';
-import { securedRoute } from './routesHelper';
-
-
+import WxOauthNotifyOA from '@/pages/user/WxOauthNotifyOA';
 
 
 const routes: Router.RouteParameters[] = [
@@ -44,7 +41,7 @@ const routes: Router.RouteParameters[] = [
   {
     name: 'login',
     path: '/wx/login',
-    component: WxOAuthLoginPage,
+    component: WxOauthLoginPageWork,
     options: {
       history: false,
       browserHistory: false,
@@ -52,9 +49,9 @@ const routes: Router.RouteParameters[] = [
     }
   },
   {
-    name: 'login2',
-    path: '/wx/login2',
-    component: LoginPage,
+    name: 'wxoaLogin',
+    path: '/wxoa/login',
+    component: WxOauthLoginPageOA,
     options: {
       history: false,
       browserHistory: false,
@@ -64,7 +61,7 @@ const routes: Router.RouteParameters[] = [
   {
     name: "wxworkAuthNotify",
     path: '/wxwork/authNotify', //前端若是SPA，通知路径可能需要添加browserHistorySeparator
-    component: WxOAuthNotifyWork,
+    component: WxOauthNotifyWork,
     options: {
       history: false,
       browserHistory: false,
@@ -74,7 +71,7 @@ const routes: Router.RouteParameters[] = [
   {
     name: "wxoaAuthNotify",
     path: '/wxoa/authNotify', //前端若是SPA，通知路径可能需要添加browserHistorySeparator
-    component: WxOAuthNotifyOa,
+    component: WxOauthNotifyOA,
     options: {
       history: false,
       browserHistory: false,

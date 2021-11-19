@@ -1,7 +1,6 @@
-import { AppKeyPrefix, isWxWorkMode } from "@/config"
-import { getItem, saveItem } from "@/request/useCache"
-import { f7 } from "framework7-react"
-import { AuthBean, CorpParams, GuestOAuthBean } from "./authData"
+import { AppKeyPrefix } from "@/config"
+import { AuthBean,  GuestOAuthBean } from "./AuthData"
+import { WebAppHelper } from "./WebAppHelper"
 
 
 /**
@@ -44,32 +43,8 @@ export const WxGuestAuthHelper = {
 }
 
 export const WxAuthHelper = {
-    //同一个企业微信账户在切换到不同单位时，应该使用不同的登录数据和业务数据，因此缓存这些数据的key需要入口页url中的参数动
-    //态变化，不可固定不变，否则导致数据不更新。这里通过入口页url中的参数来获取登录信息
-    //将入口页url参数保存到session中，关闭后丢失，重新打开时重新设置
-    setCorpParams(params: CorpParams) {
-        saveItem(`${AppKeyPrefix}/corpParams`, JSON.stringify(params))
-    },
-    getCorpParams(): CorpParams | undefined {
-        const p = getItem(`${AppKeyPrefix}/corpParams`)
-        if (p) return JSON.parse(p)
-        else return undefined
-    },
-    getKeyPrefix(): string{
-        const p = WxAuthHelper.getCorpParams()
-        const corpId_ = p?.corpId || p?.appId || p?.suiteId || 'nocorp'
-        const agentId_ = p?.agentId || 0
-        const key = `${AppKeyPrefix}/${corpId_}/${agentId_}`
-        return key
-    },
-    //prefix: ?, &
-    getCorpParamsUrlQuery(prefix: string): string {
-        const p = getItem(`${AppKeyPrefix}/corpParams`)
-        if (p) return prefix + f7.utils.serializeObject(JSON.parse(p))
-        else return ''
-    },
     getKey(): string {
-        const p = WxAuthHelper.getCorpParams()
+        const p = WebAppHelper.getCorpParams()
         const corpId_ = p?.corpId || p?.appId || p?.suiteId || 'nocorp'
         const agentId_ = p?.agentId || 0
         const key = `${AppKeyPrefix}/${corpId_}/${agentId_}/auth`
@@ -85,25 +60,23 @@ export const WxAuthHelper = {
         else
             return false
     },
+    hasRole(role: string){
+        const authBean = WxAuthHelper.getAuthBean()
+        if (authBean && authBean.uId && authBean.token && authBean.role) {
+            for (let i = 0; i < authBean.role.length; i++) {
+                if (authBean.role[i] === role)
+                    return true
+            }
+            return false
+        } else {
+            return false
+        }
+    },
     /**
      * 是否是系统管理员
      */
     isAdmin() {
-        const authBean = WxAuthHelper.getAuthBean()
-        if (authBean && authBean.uId && authBean.token && authBean.role) {
-            for (let i = 0; i < authBean.role.length; i++) {
-                if (authBean.role[i] === 'admin')
-                    return true
-            }
-            //console.log("not admin")
-            return false
-            //let flag = false
-            //authBean.role.forEach(value => {if(value === 'admin') flag = true})
-
-        } else {
-            //console.log("authBean not admin")
-            return false
-        }
+        return WxAuthHelper.hasRole("admin")
     },
     /**
      *  登录成功后的动作，记录下登录信息
@@ -157,6 +130,7 @@ export const WxAuthHelper = {
      */
     getHeaders(): {} | undefined {
         const authBean = WxAuthHelper.getAuthBean()
+        const isWxWorkApp = WebAppHelper.isWxWorkApp()
         if (authBean) {
             let header: MyHeaders = {
                 // 'Content-Type': 'application/json',
@@ -165,35 +139,36 @@ export const WxAuthHelper = {
             }
 
             if (authBean.uId) header["X-Auth-uId"] = authBean.uId
-            if(isWxWorkMode){
+            if(isWxWorkApp){
                 if (authBean.openId2) header["X-Auth-oId"] = authBean.openId2
+                if (authBean.userId) header["X-Auth-UserId"] = authBean.userId
+                if (authBean.externalUserId) header["X-Auth-ExternalUserId"] = authBean.externalUserId
+                if (authBean.suiteId) header["X-Auth-SuiteId"] = authBean.suiteId
+                if (authBean.corpId) header["X-Auth-CorpId"] = authBean.corpId
+                if (authBean.agentId) header["X-Auth-AgentId"] = authBean.agentId
             } else{
                 if (authBean.openId1) header["X-Auth-oId"] = authBean.openId1
+                if (authBean.unionId) header["X-Auth-unId"] = authBean.unionId
             }
-            if (authBean.unionId) header["X-Auth-unId"] = authBean.unionId
-            if (authBean.userId) header["X-Auth-UserId"] = authBean.userId
-            if (authBean.externalUserId) header["X-Auth-ExternalUserId"] = authBean.externalUserId
-            if (authBean.suiteId) header["X-Auth-SuiteId"] = authBean.suiteId
-            if (authBean.corpId) header["X-Auth-CorpId"] = authBean.corpId
-            if (authBean.agentId) header["X-Auth-AgentId"] = authBean.agentId
+            
             return header
         }else{
             const authBean2 = WxGuestAuthHelper.getAuthBean()
             if(authBean2){
                 let header2: MyHeaders = {}
-                if(isWxWorkMode){
+                if(isWxWorkApp){
                     if (authBean2.openId2) header2["X-Auth-oId"] = authBean2.openId2
+                    if (authBean2.userId) header2["X-Auth-UserId"] = authBean2.userId
+                    if (authBean2.externalUserId) header2["X-Auth-ExternalUserId"] = authBean2.externalUserId
+                    if (authBean2.suiteId) header2["X-Auth-SuiteId"] = authBean2.suiteId
+                    if (authBean2.corpId) header2["X-Auth-CorpId"] = authBean2.corpId
+                    if (authBean2.agentId) header2["X-Auth-AgentId"] = authBean2.agentId
                 } else{
                     if (authBean2.openId1) header2["X-Auth-oId"] = authBean2.openId1
+                    if (authBean2.unionId) header2["X-Auth-unId"] = authBean2.unionId
                 }
-                if (authBean2.unionId) header2["X-Auth-unId"] = authBean2.unionId
-                if (authBean2.userId) header2["X-Auth-UserId"] = authBean2.userId
-                if (authBean2.externalUserId) header2["X-Auth-ExternalUserId"] = authBean2.externalUserId
-                if (authBean2.suiteId) header2["X-Auth-SuiteId"] = authBean2.suiteId
-                if (authBean2.corpId) header2["X-Auth-CorpId"] = authBean2.corpId
-                if (authBean2.agentId) header2["X-Auth-AgentId"] = authBean2.agentId
                 return header2
-        } else
+            }else 
             return undefined
         }
     }

@@ -2,18 +2,14 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <!--
-  Customize this policy to fit your own app's needs. For more guidance, see:
-      https://github.com/apache/cordova-plugin-whitelist/blob/master/README.md#content-security-policy
-  Some notes:
-    * https://ssl.gstatic.com is required only on Android and is needed for TalkBack to function properly
-    * Disables use of inline scripts in order to mitigate risk of XSS vulnerabilities. To change this:
-      * Enable inline JS: add 'unsafe-inline' to default-src
-  -->
-  <meta http-equiv="Content-Security-Policy" content="default-src * 'self' 'unsafe-inline' 'unsafe-eval' data: gap: content:">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta http-equiv="Content-Security-Policy"
+    content="img-src * 'self' blob: data:; default-src * 'self' 'unsafe-inline' 'unsafe-eval' blob: data: gap: content:">
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover">
 
   <meta name="theme-color" content="#fff">
+  <meta name="color-scheme" content="light dark">
+  <meta name="referrer" content="origin-when-cross-origin" />
   <meta name="format-detection" content="telephone=no">
   <meta name="msapplication-tap-highlight" content="no">
   <title>WxWebAppBoilerplate</title>
@@ -24,17 +20,60 @@
   <link rel="icon" href="/icons/favicon.png">
   
    
-  <script src="//cdn.bootcdn.net/ajax/libs/vConsole/3.9.1/vconsole.min.js" type="text/javascript"></script>
+  <!-- <script src="//cdn.bootcdn.net/ajax/libs/vConsole/3.9.1/vconsole.min.js" type="text/javascript"></script>
   <script>
     var vConsole = new VConsole();
-  </script>
+  </script> -->
   <!-- built styles file will be auto injected -->
 </head>
-<body>
+<body id="activity-detail"
+  class="zh_CN wx_wap_page appmsg_desktop_fontsize_2  mm_appmsg discuss_tab  appmsg_skin_default appmsg_style_default ">
 <div id="app"></div>
 
 <script type="module" src="./js/app.js"></script>
 <script src="//res.wx.qq.com/open/js/jweixin-1.2.0.js"></script>
 <script src="//open.work.weixin.qq.com/wwopen/js/jwxwork-1.0.0.js"></script>
+  <script>
+    function isWeixinOrWxWorkBrowser() {
+      return /MicroMessenger/.test(navigator.userAgent);
+    }
+    function isWeixinBrowser() {
+      const ua = window.navigator.userAgent;
+      return /MicroMessenger\/([\d\.]+)/i.test(ua) && !/wxwork/i.test(ua)
+    }
+    function isWxWorkBrowser() {
+      const ua = window.navigator.userAgent;
+      return /MicroMessenger\/([\d\.]+)/i.test(ua) && /wxwork/i.test(ua)
+    }
+
+    function loadJS(url, callback) {
+      var script = document.createElement('script')
+      var fn = callback || function () { };
+      script.type = 'text/javascript';
+      script.onload = function () {
+        console.log("load done: " + url)
+        fn();
+      };
+      script.src = url;
+      document.getElementsByTagName('head')[0].appendChild(script);
+    }
+
+    var protocol = window.location.protocol
+    if (isWeixinBrowser()) {
+      console.log("to load wx js...")
+      loadJS(protocol + "//res.wx.qq.com/open/js/jweixin-1.6.0.js")
+    } else if (isWxWorkBrowser()) {
+      console.log("to load wxWork js...")
+      loadJS(protocol + "//res.wx.qq.com/open/js/jweixin-1.2.0.js")
+      loadJS(protocol + "//open.work.weixin.qq.com/wwopen/js/jwxwork-1.0.0.js")
+    } else {
+      console.log("not in wx")
+    }
+
+    //vconsole
+    if(localStorage.getItem("vconsoleEnabled") === "1"){
+      loadJS(protocol + "//cdn.bootcdn.net/ajax/libs/vConsole/3.9.1/vconsole.min.js",function(){var vConsole = new VConsole();})
+    }
+  </script>
 </body>
 </html>

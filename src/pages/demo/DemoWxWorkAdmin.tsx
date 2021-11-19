@@ -1,7 +1,8 @@
 import React from 'react';
 import { Page, Navbar, Block, BlockTitle } from 'framework7-react';
 import { AppName, hasNavBar, TextBack, Version } from '@/config';
-import { WxAuthHelper } from '../user/wxOAuthHelper';
+import { WxAuthHelper } from '../user/WxOauthHelper';
+
 
 
 

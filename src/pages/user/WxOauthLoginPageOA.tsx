@@ -2,11 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { Block, f7, Page } from 'framework7-react';
 
 import { randomAlphabetNumber } from '@/utils/random';
-import { getWithouAuth, postWithouAuth } from '@/request/myRequest';
-import { saveFrom, saveState, WxAuthHelper, WxGuestAuthHelper } from './wxOAuthHelper';
-import { AuthBean, CorpParams, LoginParam, OAuthInfo } from './authData';
-import { AppId } from '@/config';
-import { CODE, DataBox, getDataFromBox } from '@/request/databox';
+import { getWithouAuth } from '@/request/myRequest';
+import { saveFrom, saveState, WxAuthHelper, WxGuestAuthHelper } from './WxOauthHelper';
+import { CorpParams, login, LoginParam, OAuthInfo } from './AuthData';
+import { AppId, DEBUG, Host } from '@/config';
+
 
 const Scope = {
     base: "snsapi_base",
@@ -29,14 +29,22 @@ export const authorizeUrl = (appId: string, needUserInfo: boolean) => {
     const notifyPath = needUserInfo ? NotifyPath.userInfo : NotifyPath.base
     const scope = needUserInfo ? Scope.userInfo: Scope.base 
 
-    const Host =  window.location.protocol + "//" + window.location.host
-    const redirectUri = encodeURI(`${Host}${notifyPath}/${appId}`)
+    //const Host =  window.location.protocol + "//" + window.location.host
+    const url = `${Host}${notifyPath}/${appId}`
+    
+    const redirectUri = encodeURI(url)
+    console.log("redirectUri="+url+", after encodeURI="+redirectUri)
 
     return `https://open.weixin.qq.com/connect/oauth2/authorize?appid=${appId}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}&state=${state}#wechat_redirect`
 }
 
+const directlyRedirectOAuth = (appId:string,needUserInfo: boolean, from?: string) => {
+    if (from) saveFrom(from)
+    window.location.href = authorizeUrl(appId, needUserInfo)
+}
 
-const LoginPage: React.FC<LoginParam> = (props: any) => {
+
+const WxOauthLoginPageOA: React.FC<LoginParam> = (props: any) => {
     const [status, setStatus] = useState<string>()
     
     const query: CorpParams =  f7.utils.parseUrlQuery(props.from);
@@ -44,10 +52,7 @@ const LoginPage: React.FC<LoginParam> = (props: any) => {
 
     const {from, needUserInfo, owner, silentLogin} = props
 
-    const directlyRedirect = (needUserInfo: boolean) => {
-        if (from) saveFrom(from)
-        window.location.href = authorizeUrl(appId, needUserInfo)
-    }
+
 
     /**
      * 只有newsDetail中，若已经有openId，再去获取userInfo时，直接进入step2获取用户信息，无需经过step1
@@ -57,8 +62,7 @@ const LoginPage: React.FC<LoginParam> = (props: any) => {
 
         f7.dialog.preloader('登录中...')
 
-    
-        getWithouAuth( '/api/wx/oa/oauth/info', {...query, owner: props.owner, openId: props.openId})
+        getWithouAuth( '/api/wx/oa/oauth/info', {...query, owner: props.owner, openId: openId})
        //前端负责state，拼接跳转url， state校验，然后直接进行跳转，不再向后端请求
             .then(function (res) {
                 f7.dialog.close()
@@ -66,11 +70,11 @@ const LoginPage: React.FC<LoginParam> = (props: any) => {
                 if(openId && !oauthInfo.needUseInfo){ //若已有openId，且无需获取userInfo，直接打开页面
                     //这时需要设置hasUserInfo，否则又回到打开newsDetail的链接，一直无限循环下去
                     WxGuestAuthHelper.onAuthenticated({ appId: appId, openId1: openId, hasUserInfo: true})
-                    window.location.href = from //props.f7router.navigate(from)
+                    f7.views.main.router.navigate(from) //window.location.href = from //props.f7router.navigate(from) 
                 }else{
                     saveState(oauthInfo.state)
                     if (from) saveFrom(from)
-                    window.location.href = oauthInfo.authorizeUrl //有可能获取用户信息，有可能不获取
+                    window.location.href = oauthInfo.authorizeUrl //有可能获取用户信息，有可能不获取，取决于提交的owner以及openId，由后端根据这两个参数决定是否获取
                 }
                 
             })
@@ -88,7 +92,7 @@ const LoginPage: React.FC<LoginParam> = (props: any) => {
         if(needUserInfo === undefined){ //没有明确指定是否获取userInfo，通常用于newsDetail页面
             if(!owner){
                 console.warn("owner is undefined, are you sure?")
-                directlyRedirect(true) //没有owner情况，都认为需要获取userinfo
+                directlyRedirectOAuth(appId, true, from) //没有owner情况，都认为需要获取userinfo
             }else{
                 const guestOpenId = WxGuestAuthHelper.getAuthBean()?.openId1
                 if(guestOpenId){//已经经过第一步认证，即有openId，但无头像和昵称，直接进入根据后端判定是否进入第二步
@@ -98,41 +102,23 @@ const LoginPage: React.FC<LoginParam> = (props: any) => {
                 }
             }
         }else{
-            if(silentLogin){//静默登录
+            if(silentLogin){//明确要求静默登录
                 //const f7router = f7.views.main.router
                 const openId = WxAuthHelper.getAuthBean()?.openId1
                 if(!openId){
-                    directlyRedirect(needUserInfo) //无openId
+                    //无openId
+                    directlyRedirectOAuth(appId, needUserInfo, from)
                 }else{
-                    console.log("silent login...")
-                    postWithouAuth(`/api/u/login`, { name: openId,  type: "wechat" })
-                    .then(function (res) {
-                        f7.dialog.close()
-                        const box: DataBox<AuthBean> = res.data
-                        if (box.code == CODE.OK) {
-                            const authBean = getDataFromBox(box)
-                            if (authBean) {
-                                WxAuthHelper.onAuthenticated(authBean)
-                            } else {
-                                console.log(box.msg)
-                            }
-                        } else if (box.code == CODE.NewUser) {
-                            window.location.href = "/u/register?from="+from
-                        } else {
-                            console.log(box.msg)
-                            f7.dialog.alert("出错了：试试关闭窗口，重新打开"+box.msg)
-                        }
-                    })
-                    .catch(function (err) {
-                        f7.dialog.close()
-                        const msg_ = err.status + ": " + err.message
-                        console.log(msg_)
-                        f7.dialog.alert("出错了："+msg_)
-                    })
+                    if(DEBUG) console.log("silent login...")
+                    login(openId, () => console.log("successful to login"),
+                        () => f7.views.main.router.navigate("/u/register", { props: { from: from } }),
+                        (msg) => f7.dialog.alert("出错了：试试关闭窗口，重新打开"+msg)
+                    )
             
                 }
             }else{
-                directlyRedirect(needUserInfo) //有明确要求是否获取
+                //非静默登录，根据needUserInfo是否获取用户信息
+                directlyRedirectOAuth(appId, needUserInfo, from)
             }    
         }
     }, [])
@@ -144,4 +130,4 @@ const LoginPage: React.FC<LoginParam> = (props: any) => {
     )
 }
 
-export default LoginPage
+export default WxOauthLoginPageOA

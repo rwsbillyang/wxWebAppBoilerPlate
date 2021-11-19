@@ -1,8 +1,9 @@
 import React, { useEffect } from 'react';
 import { Page, f7, Block } from 'framework7-react';
 import { getWithouAuth } from '@/request/myRequest';
-import { CorpParams, OAuthInfo } from './authData';
-import { saveFrom, saveState } from './wxOAuthHelper';
+import { CorpParams, OAuthInfo } from './AuthData';
+import { saveFrom, saveState } from './WxOauthHelper';
+import { DEBUG } from '@/config';
 
 
 
@@ -14,7 +15,7 @@ import { saveFrom, saveState } from './wxOAuthHelper';
  * 
  * 下一步将执行到wxOAuthNotifyxx.tsx
  */
-const WxOAuthLoginPage = (props) => {
+const WxOauthLoginPageWork = (props) => {
 
     //对于RoutableTab，无pageInit等page事件
     const pageInit = () => {
@@ -33,7 +34,7 @@ const WxOAuthLoginPage = (props) => {
         const query: any =  f7.utils.parseUrlQuery(props.from);
         const param: CorpParams = {appId: query?.appId, corpId: query?.corpId, agentId:query?.agentId}
 
-    
+
         getWithouAuth('/api/wx/work/oauth/info?scope=1', param)
             .then(function (res) {
                 f7.dialog.close()
@@ -44,7 +45,7 @@ const WxOAuthLoginPage = (props) => {
                 //const from = f7.views.main.router.currentRoute.query["from"]
                 
                 if (from) saveFrom(from)
-                console.log("reidreact authorizeUrl="+oauthInfo.authorizeUrl)
+                if(DEBUG) console.log("reidreact authorizeUrl="+oauthInfo.authorizeUrl)
                 window.location.href = oauthInfo.authorizeUrl
             })
             .catch(function (err) {
@@ -54,16 +55,16 @@ const WxOAuthLoginPage = (props) => {
                 console.log(err.xhr + ", " + err.status + ": " + err.message)
             })
     }
+
     useEffect(() =>{ 
         pageInit() //对于RoutableTab，无pageInit等page事件
     }, [])
 
-
     return (
-        <Page name="login">
+        <Page name="login" >
             <Block>请稍候...</Block>
         </Page>
     )
 }
 
-export default WxOAuthLoginPage
+export default WxOauthLoginPageWork

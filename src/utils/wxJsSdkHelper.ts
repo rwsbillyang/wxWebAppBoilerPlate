@@ -1,13 +1,14 @@
 
-import { WxAuthHelper } from '@/pages/user/wxOAuthHelper';
 import { useEffect, useState } from 'react'
 
 import { CODE, DataBox, getDataFromBox } from '@/request/databox'
 import { get } from "@/request/myRequest"
 import { getItem, saveItem } from '@/request/useCache'
-import { AppId, AppKeyPrefix, enableAgentConfig, isWxWorkMode } from '@/config';
+import { AppId, AppKeyPrefix, enableAgentConfig } from '@/config';
 import { CorpParams } from '@/pages/user/authData';
 import { f7 } from 'framework7-react';
+import { RequestResponse } from 'framework7/types';
+import { WebAppHelper } from '@/pages/user/webAppHelper';
 
 //分享接口仅激活的成员数超过200人且已经认证的企业才可在微信上调用。
 
@@ -19,18 +20,18 @@ export interface JsSignature {
     objectId: string //share or relay id
 }
 
-//const keyprefix = WxAuthHelper.getKeyPrefix()
+
  const WxJsStatusKey = AppKeyPrefix + "/WxJsStatus"
  const WxJsNtKey = AppKeyPrefix + "/WxJsNtKey"
 
-export function isWeixinOrWxWork() {
+export function isWeixinOrWxWorkBrowser() {
     return /MicroMessenger/.test(navigator.userAgent);
 }
-export function isWeixin() {
+export function isWeixinBrowser() {
     const ua = window.navigator.userAgent;
     return /MicroMessenger\/([\d\.]+)/i.test(ua) && !/wxwork/i.test(ua)
 }
-export function isWxWork() {
+export function isWxWorkBrowser() {
     const ua = window.navigator.userAgent;
     return /MicroMessenger\/([\d\.]+)/i.test(ua) && /wxwork/i.test(ua)
 }
@@ -44,7 +45,7 @@ const defaultJsApiList = [
     'onMenuShareWeibo',
     'onMenuShareQZone',
 
-    isWxWorkMode? 'onMenuShareWeChat': 'startRecord',
+    'onMenuShareWeChat',
     // 'startRecord',
     // 'stopRecord',
     // 'onVoiceRecordEnd',
@@ -73,10 +74,10 @@ const defaultJsApiList = [
     'closeWindow',
     'scanQRCode',
     'chooseWXPay',
-    'openProductSpecificView',
-    'addCard',
-    'chooseCard',
-    'openCard'
+    //'openProductSpecificView',
+    //'addCard',
+    //'chooseCard',
+    //'openCard'
 ]
 
 /**
@@ -111,7 +112,7 @@ export interface WxInitResult {
     const [networkType, setNetworkType] = useState<string|undefined>(getItem(WxJsNtKey))
 
     useEffect(() => {
-        if(!isWeixinOrWxWork())
+        if(!isWeixinOrWxWorkBrowser())
         {
             setStatus(WxJsStatus.NotWeixin)
             f7.data.wxJsStatus = WxJsStatus.NotWeixin
@@ -125,22 +126,33 @@ export interface WxInitResult {
     const getSignautre = () => {
         //避免重复请求
         if (f7.data.wxJsStatus == undefined || f7.data.wxJsStatus <= WxJsStatus.None) { //若还处在初始状态，就进行签名验证，否则不验证。避免中途再次调用getSignautre
-            const params = WxAuthHelper.getCorpParams()
-            const appId = params?.appId
+            const params = WebAppHelper.getCorpParams()
+            const appId = params?.appId || AppId
             const corpId = params?.corpId
             const agentId = params?.agentId
             
-            if (isWxWorkMode && (!corpId || !agentId)) {
+            const isWxWorkApp = WebAppHelper.isWxWorkApp()
+            console.log("to getSignautre...isWxWorkApp="+isWxWorkApp);
+
+            let p: Promise<RequestResponse>
+            //企业微信的jsSDK自定义分享不能在微信中正确设置，使用对应的公众号配置
+            //因此：在微信中，就使用公众号的配置; 在企业微信中，就使用企业微信的配置
+            if(isWxWorkApp && isWxWorkBrowser()){//企业微信浏览器中
+                if (!corpId || !agentId) {
                 console.warn("no corpId=" + corpId + " or agentId=" + agentId)
             }
-            if (!isWxWorkMode && !appId) {
+                p = get("/api/wx/work/jssdk/signature", params)
+            }else if(isWeixinBrowser()){//微信浏览器中
+                if (!appId) {
                 console.warn("no appId=" + appId)
             }
-            console.log("to getSignautre...");
+                p = get("/api/wx/oa/jssdk/signature", { appId: appId })
+            }else{
+                console.warn("no in weixin browser or wx work browser?")
+                return false
+            }
 
-            (isWxWorkMode? get("/api/wx/work/jssdk/signature", params)
-            :get("/api/wx/oa/jssdk/signature", { appId: appId || AppId }) )
-                .then(res => {
+            p.then(res => {
                     f7.data.wxJsStatus = WxJsStatus.SDKInitializing
                     setStatus(WxJsStatus.SDKInitializing)
 
@@ -149,7 +161,6 @@ export interface WxInitResult {
                     if (box.code === CODE.OK) {
                         const data = getDataFromBox(box)
                         if (data) {
-                            onOauthData(data, params, corpId, agentId, jsapiList)
 
                             wx.ready(() => {
                                 f7.data.wxJsStatus = WxJsStatus.Ready
@@ -217,6 +228,7 @@ export interface WxInitResult {
             //spa webapp, not need update signature for every url
             console.log("status="+status+",ignore getSignature,  nt=" + networkType)
         }
+        return false
     }
     return { status, networkType }
 }
@@ -224,8 +236,17 @@ export interface WxInitResult {
 
 
 //JS-SDK:  https://open.work.weixin.qq.com/api/doc/10029  
-function onOauthData(data: JsSignature, params?: CorpParams, corpId?: string, agentId?: number, jsapiList: string[] = defaultJsApiList) {
-    if (isWxWorkMode) {
+function wxConfig(isWxWorkApp:boolean, data: JsSignature, params?: CorpParams, corpId?: string, agentId?: number, jsapiList: string[] = defaultJsApiList) {
+    wx.checkJsApi({
+        jsApiList: jsapiList, // 需要检测的JS接口列表
+        success: function(res) {
+            // 以键值对的形式返回，可用的api值true，不可用为false
+            // 如：{"checkResult":{"chooseImage":true},"errMsg":"checkJsApi:ok"}
+            console.log(res)
+        }
+    });
+    if(isWxWorkApp && isWxWorkBrowser()){//企业微信浏览器中
+        console.log("wxwork config...")
         wx.config({
             beta: true,// 必须这么写，否则wx.invoke调用形式的jsapi会有问题
             debug: false, // 开启调试模式,调用的所有api的返回值会在客户端alert出来，若要查看传入的参数，可以在pc端打开，参数信息会通过log打出，仅在pc端时才会打印。
@@ -241,19 +262,33 @@ function onOauthData(data: JsSignature, params?: CorpParams, corpId?: string, ag
                 }
             },
             fail: function (res: any) {
+                console.log("wxwork wx.config fail: "+ res.errMsg)
                 if (res.errMsg.indexOf('function not exist') > -1) {
                     alert('版本过低请升级')
                 }
             }
         })
-    } else {
+    }else if(isWeixinBrowser()){//微信浏览器中
+        console.log("wxoa config...")
         wx.config({
             debug: false, // 开启调试模式,调用的所有api的返回值会在客户端alert出来，若要查看传入的参数，可以在pc端打开，参数信息会通过log打出，仅在pc端时才会打印。
             appId: data.appId,// 必填，企业微信的corpID
             timestamp: data.timestamp,// 必填，生成签名的时间戳
             nonceStr: data.nonceStr,// 必填，生成签名的随机串
             signature: data.signature, // 必填，签名，见 附录-JS-SDK使用权限签名算法
-            jsApiList: jsapiList// 必填，需要使用的JS接口列表，凡是要调用的接口都需要传进来
+            jsApiList: jsapiList,// 必填，需要使用的JS接口列表，凡是要调用的接口都需要传进来
+            success: function (res: any) {
+                console.log("wxoa wx.config successfully")
+                if(enableAgentConfig){
+                    injectAgentConfig(params, corpId, agentId, jsapiList)
+                }
+            },
+            fail: function (res: any) {
+                console.log("wxoa wx.config fail: "+ res.errMsg)
+                if (res.errMsg.indexOf('function not exist') > -1) {
+                    alert('版本过低请升级')
+                }
+            }
         });
     }
 }
@@ -324,13 +359,13 @@ function injectAgentConfig(params?: CorpParams, corpId?: string, agentId?: numbe
 
     sendWxInitResultEvent(WxJsStatus.None)
 
-    if (!isWeixin()) {
+    if (!isWeixinOrWxWorkBrowser()) {
         sendWxInitResultEvent(WxJsStatus.NotWeixin)
         console.log("not in wx")
         return false
     }
 
-    get("/api/wx/oa/jssdk/signature", WxAuthHelper.getCorpParams())
+    get("/api/wx/oa/jssdk/signature", WebAppHelper.getCorpParams())
         .then(res => {
             sendWxInitResultEvent(WxJsStatus.SDKInitializing)
 

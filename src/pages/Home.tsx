@@ -13,7 +13,8 @@ import {
 } from 'framework7-react';
 import { AppName, hasNavBar } from '@/config';
 import { evictAllCaches, StorageType } from '@/request/useCache';
-import { WxAuthHelper } from './user/wxOAuthHelper';
+import { WxAuthHelper } from './user/WxOauthHelper';
+
 
 const HomePage = () => (
   <Page name="home">

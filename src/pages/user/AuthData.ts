@@ -1,3 +1,7 @@
+import { CODE, DataBox, getDataFromBox } from "@/request/databox"
+import { postWithouAuth } from "@/request/myRequest"
+import { f7 } from "framework7-react"
+import { WxAuthHelper } from "./WxOauthHelper"
 
 /**
  * 用于从url中提取路径中的参数，oauth认证时，需要知道是哪个公众号，
@@ -34,7 +38,6 @@
     needUseInfo?: boolean
 }
 
-
 export interface GuestOAuthBean{
     appId?: string// 公众号
     unionId?: string,// 公众号
@@ -47,7 +50,8 @@ export interface GuestOAuthBean{
     externalUserId?: string,//企业微信外部成员id
     corpId?: string,
     agentId?: number,
-    suiteId?: string
+    suiteId?: string,
+    deviceId?: string
 }
 
 export interface AuthBean extends GuestOAuthBean{
@@ -61,8 +65,46 @@ export interface AuthBean extends GuestOAuthBean{
     avatar?: string,
     nick?: string,
     qrCode?: string  
+    ext?: string //扩展字段，如推广模式：个人品牌，产品广告等
 }
 
 
-
-  
+/**
+ * 适用于公众号登录
+ * 各种需要登录的地方，需求可能有所区别，提取于此，都用到它
+ * 本来不需要每次进入都登录，只不过收到奖励后需要更新，才每次都获取最新值，同时后端可对token进行检查
+ */
+ export function login(openId: string,  
+    onOK: ()=> void, 
+    onNewUser:() => void,
+    onFail:(msg: string) => void,
+    unionId?: string
+){
+    f7.dialog.preloader('登录中...')
+    postWithouAuth(`/api/wx/oa/account/login`, { name: openId, pwd: unionId, type: "wechat" })
+    .then(function (res) {
+        f7.dialog.close()
+        const box: DataBox<AuthBean> = res.data
+        if (box.code == CODE.OK) {
+            const authBean = getDataFromBox(box)
+            if (authBean) {
+                WxAuthHelper.onAuthenticated(authBean)
+                onOK()
+            } else {
+                console.log(box.msg)
+                onFail("no data")
+            }
+        } else if (box.code == CODE.NewUser) {
+            onNewUser()
+        } else {
+            console.log(box.msg)
+            onFail(box.msg || "something wrong")
+        }
+    })
+    .catch(function (err) {
+        f7.dialog.close()
+        const msg_ = err.status + ": " + err.message
+        console.log(msg_)
+        onFail(msg_)
+    })
+}

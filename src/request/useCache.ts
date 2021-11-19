@@ -1,14 +1,17 @@
 
 import { f7 } from "framework7-react"
 import { useEffect, useState } from "react";
-import { CODE, DataBox, getDataFromBox } from "./databox"
+import { CODE, DataBox, encodeUmi, getDataFromBox, UmiListPagination } from "./databox"
 import { get } from "./myRequest";
 
+//后端默认为10，若需修改，需在前端提交umi数据，并设置此处的PageSize
+export const PageSize = 10
 
-export const PageSize = 20
+const DebugCache = false
 
 
 export interface ListQueryBase {
+    pagination?: UmiListPagination
     umi?: string,
     keyword?: string,
     lastId?: string
@@ -296,24 +299,26 @@ export function fetchListCachely<T>(
 export function useCacheList<T, P extends ListQueryBase>(
     listKey: string,
     url: string,
-    queryParams: P,
+    queryParams?: P,
     needLoadMore: boolean = true, //分页数据为true，全部数据为false
     storageType: number = StorageType.OnlySessionStorage
 ) {
     const [list, setList] = useState<T[]>();
-    const [query, setQuery] = useState<P>(queryParams) //请求查询条件变化将导致重新请求
+    const [query, setQuery] = useState<P|undefined>(queryParams) //请求查询条件变化将导致重新请求
     const [isLoading, setIsLoading] = useState(true); //加载状态
     const [isError, setIsError] = useState(false); //加载是否有错误
     const [errMsg, setErrMsg] = useState<string>() //加载错误信息
     const [loadMoreState, setLoadMoreState] = useState(getLoadMoreState(listKey)) //加载更多 按钮状态：可用和不可用，自动被管理，无需调用者管理
     const [refresh, setRefresh] = useState<number>() //refresh只要改变就会引起获取值的操作。当为0时表示从远程获取，其它值则从本地获取
 
+    const [currentPage, setCurrentPage] = useState(1)
 
     //从远程加载数据，会动态更新加载状态、是否有错误、错误信息
     //加载完毕后，更新list，自动缓存数据（与现有list合并）、设置加载按钮状态
-    const fetchDataFromRemote = (query: P, onDone?:(data?: T[])=>void, isMergeResult: boolean = false) => {
-        console.log("fetch from remote...for key="+listKey)
-        get(url, query)
+    const fetchDataFromRemote = (query?: P, onDone?:(data?: T[])=>void, isMergeResult: boolean = false) => {
+        if(DebugCache) console.log("fetch from remote...for key="+listKey)
+        
+        get(url,  query?.pagination? {...query, umi: encodeUmi({...query.pagination, current: currentPage}), pagination: undefined} : query)
             .then(res => {
                 setIsLoading(false)
                 const box: DataBox<T[]> = res.data
@@ -324,7 +329,7 @@ export function useCacheList<T, P extends ListQueryBase>(
 
                         const result = (isMergeResult && list && list.length > 0) ? list.concat(data) : data
                         setList(result)
-                        if(!query?.keyword){ //不缓存搜索结果
+                        if(!query?.keyword){ //非搜索，缓存搜索结果
                             saveItem(listKey, JSON.stringify(result), storageType)
                         }
 
@@ -372,25 +377,27 @@ export function useCacheList<T, P extends ListQueryBase>(
     }
 
     useEffect(() => {
-        console.log("in useEffect loading: refresh="+refresh+", url="+url+", query="+JSON.stringify(query))
+        if(DebugCache) console.log("in useEffect loading: currentPage="+currentPage+", refresh="+refresh+", url="+url+", query="+JSON.stringify(query))
         //setList(undefined) 应由调用者重置list，因为在加载更多时，不能重置list；调用者判断是正常加载还是加载更多，决定是否重置list
         setIsLoading(true)
-        if(query.lastId || query.keyword || refresh == 1){ //首次搜索不合并结果
-            fetchDataFromRemote(query, undefined, !!query?.lastId)//只有加载更多需合并结果，无论是否在搜索
+        if(query?.lastId || query?.keyword || refresh == 1 || currentPage > 1){ //首次搜索不合并结果
+            if(DebugCache) console.log("lastId or keyword or refresh, or currentPage > 1 , try from remote...")
+            fetchDataFromRemote(query, undefined, !!query?.lastId || currentPage > 1)//只有加载更多需合并结果，无论是否在搜索
         }else{
             const v = getItem(listKey, storageType)
             if (v) {
-                console.log("fetch from cache...,refresh="+refresh+", key="+listKey)
+                if(DebugCache) console.log("fetch from local cache...,refresh="+refresh+", key="+listKey)
                 setList(JSON.parse(v))
                 setIsLoading(false)
             } else {
+                if(DebugCache) console.log("no local cache, try from remote...")
                 fetchDataFromRemote(query)//无缓存时合并和不合并没有意义，干脆不合并
             }
         } 
      
-    }, [url, query, refresh])// url, query, refresh变化，导致重新请求. refresh值变化导致重新取数据
+    }, [url, query, refresh, currentPage])// url, query, refresh变化，导致重新请求. refresh值变化导致重新取数据
 
-    return { isLoading, isError, errMsg, loadMoreState, query, setQuery, list, setList, fetchDataFromRemote, refresh, setRefresh}
+    return { isLoading, isError, errMsg, loadMoreState, query, setQuery, list, setList, fetchDataFromRemote, refresh, setRefresh, currentPage, setCurrentPage}
 }
 
 
@@ -467,4 +474,61 @@ export const evictAllCaches = (storageType: number = StorageType.OnlySessionStor
 }
 
 
+//修改列表数据缓存，当新增一个
+export function onAddOne<T>(key: string, e: T,  storageType: number = StorageType.OnlySessionStorage){
+    const str = getItem(key)
+    if (str) {
+        const arry: T[] = JSON.parse(str)
+        if (arry && arry.length > 0){
+            arry.unshift(e)
+            saveItem(key, JSON.stringify(arry))
+        }else
+            saveItem(key, JSON.stringify([e]))
+    } else
+        saveItem(key, JSON.stringify([e]))
 
+}
+
+/**
+ * 编辑后修改缓存, 必须以_id作为键值进行比较
+ */
+ export function onEditOne<T> (key: string, e: T ) {
+    const str = getItem(key)
+    if (str) {
+        let arry: T[] = JSON.parse(str)
+        if (arry && arry.length > 0) {
+            //搜索现有列表，找到后更新
+            for (let i = 0; i < arry.length; i++) {
+                if (arry[i]["_id"] === e["_id"]) {
+                    console.log("update one: id=" + e["id"])
+                    arry[i] = e
+                    break;
+                }
+            }
+            saveItem(key, JSON.stringify(arry))
+        }
+    }
+}
+
+
+/**
+ * 编辑后修改缓存, 必须以_id作为键值进行比较
+ */
+ export function onDelOne<T>(key: string, _id: string) {
+    const str = getItem(key)
+    if (str) {
+        let arry: T[] = JSON.parse(str)
+        if (arry && arry.length > 0) {
+            //搜索现有列表，找到后删除
+            for (let i = 0; i < arry.length; i++) {
+                if (arry[i]["_id"] === _id) {
+                    console.log("del one: id=" + _id)
+                    arry.splice(i, 1)
+                    saveItem(key, JSON.stringify(arry))
+                    return arry;
+                }
+            }
+        }
+    }
+    return undefined
+}

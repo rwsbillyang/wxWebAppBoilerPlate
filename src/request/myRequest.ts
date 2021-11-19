@@ -1,4 +1,4 @@
-import { WxAuthHelper } from '@/pages/user/wxOAuthHelper';
+import { WxAuthHelper } from '@/pages/user/WxOauthHelper';
 import { request } from 'framework7';
 
 
