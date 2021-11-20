@@ -9,11 +9,11 @@ import { ComponentFunction } from "framework7/types/modules/component/component"
 import { BrowserHistorySeparator, DEBUG } from "@/config";
 import ErrorPage from "@/pages/auxiliary/Error";
 
-import { CorpParams } from "@/pages/user/AuthData";
-import WxOauthLoginPageWork from "@/pages/user/WxOauthLoginPageWork";
-import WxOauthLoginPageOA from "@/pages/user/WxOauthLoginPageOA";
-import { WebAppHelper } from "@/pages/user/WebAppHelper";
-import { WxAuthHelper, WxGuestAuthHelper } from '@/pages/user/WxOauthHelper';
+import { CorpParams } from "@/user/AuthData";
+import WxOauthLoginPageWork from "@/user/WxOauthLoginPageWork";
+import WxOauthLoginPageOA from "@/user/WxOauthLoginPageOA";
+import { WebAppHelper } from "@/user/WebAppHelper";
+import { WxAuthHelper, WxGuestAuthHelper } from '@/user/WxOauthHelper';
 
 
 

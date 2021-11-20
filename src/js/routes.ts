@@ -9,18 +9,18 @@ import Feedback from '@/pages/auxiliary/Feedback';
 import ContactKf from '@/pages/auxiliary/ContactKf';
 
 import { securedRoute } from './routesHelper';
-import WxOauthLoginPageWork from '@/pages/user/WxOauthLoginPageWork';
+import WxOauthLoginPageWork from '@/user/WxOauthLoginPageWork';
 
 import RoutableTabs from '@/pages/demo/RoutableTabs';
-import WxOauthLoginPageOA from '@/pages/user/WxOauthLoginPageOA';
-import WxOauthNotifyWork from '@/pages/user/WxOauthNotifyWork';
+import WxOauthLoginPageOA from '@/user/WxOauthLoginPageOA';
+import WxOauthNotifyWork from '@/user/WxOauthNotifyWork';
 
 import DemoWxWorkAdmin from '@/pages/demo/DemoWxWorkAdmin';
 import Tab1 from '@/pages/demo/Tab1';
 import Tab2 from '@/pages/demo/Tab2';
 import Tab3 from '@/pages/demo/Tab3';
 import Tab4 from '@/pages/demo/Tab4';
-import WxOauthNotifyOA from '@/pages/user/WxOauthNotifyOA';
+import WxOauthNotifyOA from '@/user/WxOauthNotifyOA';
 
 
 const routes: Router.RouteParameters[] = [

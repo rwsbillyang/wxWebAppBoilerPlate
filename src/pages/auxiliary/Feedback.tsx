@@ -3,7 +3,7 @@ import { Button, f7, List, ListInput, Navbar, Page } from 'framework7-react';
 import { post } from '@/request/myRequest';
 import { fetchDiscachely } from '@/request/useCache';
 import { hasNavBar } from '@/config';
-import { WxAuthHelper } from '../user/WxOauthHelper';
+import { WxAuthHelper } from '../../user/WxOauthHelper';
 
 
 export default (props: any) => {
