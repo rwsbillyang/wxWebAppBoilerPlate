@@ -20,4 +20,7 @@ export const canvasStyle: CSSProperties = { marginLeft: '2px', marginRight: '2px
 
 export const radius50: CSSProperties = { borderRadius: "50%", paddingRight: '10px' }
 
+export const pageCenter: CSSProperties = { left: "50%", top: '30%', position: "absolute", transform: "translate(-50%,-30%)" }
 export const pageCenter2: CSSProperties = { left: "50%", top: '50%', position: "absolute", transform: "translate(-50%,-50%)" }
+
+export const pageCenter3: CSSProperties = { top: '40%', position: "relative", transform: "translateY(-40%)"}

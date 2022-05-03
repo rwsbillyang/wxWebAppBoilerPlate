@@ -1,4 +1,5 @@
 import { AppKeyPrefix } from "@/config"
+import { evictCache, getItem, saveItem, StorageType } from "@/request/useCache"
 import { AuthBean,  GuestOAuthBean } from "./AuthData"
 import { WebAppHelper } from "./WebAppHelper"
 
@@ -8,27 +9,20 @@ import { WebAppHelper } from "./WebAppHelper"
  */
 export const WxGuestAuthHelper = {
     getKey(): string {
-        return WxAuthHelper.getKey() + "/guest"
+        return  "/auth/guest"
     },
     getAuthBean(): GuestOAuthBean | undefined {
         const key = WxGuestAuthHelper.getKey()
-        let value = sessionStorage.getItem(key)
-        if (!value) {
-            value = localStorage.getItem(key)
-            if (!!value) {
-                sessionStorage.setItem(key, value)
-            } else {
-                console.log("no value in storage for key=" + key)
-                return undefined
-            }
-        }
+        const value = getItem(key, StorageType.BothStorage)
+        if(!value) return undefined
         return JSON.parse(value)
     },
-    onAuthenticated(authBean: GuestOAuthBean) {
+    onAuthenticated(authBean: GuestOAuthBean, storageType: number) {
         const key = WxGuestAuthHelper.getKey()
         const str = JSON.stringify(authBean)
-        sessionStorage.setItem(key, str)
-        localStorage.setItem(key, str)
+        saveItem(key, str, storageType)
+        //sessionStorage.setItem(key, str)
+        //localStorage.setItem(key, str)
     },
     /**
      * 判断是否登录
@@ -39,16 +33,43 @@ export const WxGuestAuthHelper = {
             return true
         else
             return false
-    }
+    },
+    onSignout(cb?: () => void) {
+        const key = WxGuestAuthHelper.getKey()
+        // sessionStorage.removeItem(key)
+        // localStorage.removeItem(key)
+        evictCache(key,  StorageType.BothStorage)
+        if (cb) {
+            cb()
+        }
+    },
 }
 
 export const WxAuthHelper = {
     getKey(): string {
-        const p = WebAppHelper.getCorpParams()
-        const corpId_ = p?.corpId || p?.appId || p?.suiteId || 'nocorp'
-        const agentId_ = p?.agentId || 0
-        const key = `${AppKeyPrefix}/${corpId_}/${agentId_}/auth`
-        return key
+        //const p = WebAppHelper.getCorpParams()
+        //const corpId_ = p?.corpId || p?.appId || p?.suiteId || 'nocorp'
+        //const agentId_ = p?.agentId || 0
+        //const key = `${AppKeyPrefix}/${corpId_}/${agentId_}/auth`
+        return "/auth"
+    },
+    /**
+     * 
+     * @param groupNeed 资源需要的分组，不需要分组时为空，返回true
+     * @param userGroup 用户所在分组，若为空则为false
+     * @returns 检查用户所具在分组，是否是在资源所需要的分组范围内，有交集为true，否则false
+     */
+    isInGroup(groupNeed?: string[], userGroup?: string[]){
+        if(!groupNeed || groupNeed.length === 0) return true //不需要权限
+        if(!userGroup || userGroup.length === 0) return false //用户没有权限
+        //只要有交集就有权限
+        for(let i=0;i<groupNeed.length;i++){
+            const gId = groupNeed[i]
+            for(let j=0;j<userGroup.length;j++){
+                if(userGroup[j] === gId) return true
+            }
+        }
+        return false
     },
     /**
      * 判断是否登录
@@ -61,11 +82,17 @@ export const WxAuthHelper = {
             return false
     },
     hasRole(role: string){
+        return WxAuthHelper.authBeanHasRole([role])
+    },
+    authBeanHasRole(anyRoles: string[]){
         const authBean = WxAuthHelper.getAuthBean()
         if (authBean && authBean.uId && authBean.token && authBean.role) {
-            for (let i = 0; i < authBean.role.length; i++) {
-                if (authBean.role[i] === role)
-                    return true
+            for(let j=0;j<anyRoles.length;j++){
+                const role = anyRoles[j]
+                for (let i = 0; i < authBean.role.length; i++) {
+                    if (authBean.role[i] === role)
+                        return true
+                }
             }
             return false
         } else {
@@ -81,19 +108,21 @@ export const WxAuthHelper = {
     /**
      *  登录成功后的动作，记录下登录信息
      */
-    onAuthenticated(authBean: AuthBean) {
+    onAuthenticated(authBean: AuthBean, storageType: number) {
         const key = WxAuthHelper.getKey()
         const str = JSON.stringify(authBean)
-        sessionStorage.setItem(key, str)
-        localStorage.setItem(key, str)
+        saveItem(key, str, storageType)
+        // sessionStorage.setItem(key, str)
+        // localStorage.setItem(key, str)
     },
     /**
      * 退出登录成功后的动作
      */
     onSignout(cb?: () => void) {
         const key = WxAuthHelper.getKey()
-        sessionStorage.removeItem(key)
-        localStorage.removeItem(key)
+        evictCache(key,  StorageType.BothStorage)
+        // sessionStorage.removeItem(key)
+        // localStorage.removeItem(key)
         if (cb) {
             cb()
         }
@@ -109,17 +138,19 @@ export const WxAuthHelper = {
      * */
     getAuthBean(): AuthBean | undefined {
         const key = WxAuthHelper.getKey()
+        const value = getItem(key, StorageType.BothStorage)
+        if(!value) return undefined
 
-        let value = sessionStorage.getItem(key)
-        if (!value) {
-            value = localStorage.getItem(key)
-            if (!!value) {
-                sessionStorage.setItem(key, value)
-            } else {
-                console.log("no value in storage for key=" + key)
-                return undefined
-            }
-        }
+        // let value = sessionStorage.getItem(key)
+        // if (!value) {
+        //     value = localStorage.getItem(key)
+        //     if (!!value) {
+        //         sessionStorage.setItem(key, value)
+        //     } else {
+        //         console.log("no value in storage for key=" + key)
+        //         return undefined
+        //     }
+        // }
         return JSON.parse(value)
     },
 
@@ -186,30 +217,42 @@ interface MyHeaders{
     "X-Auth-AgentId"?: number | undefined
 }
 
-export function saveState(state: string) {
-    const key = `${AppKeyPrefix}/sys/state`
-    sessionStorage.setItem(key, state)
+export function saveValue(shortKey: string, value: string)
+{
+    const key = `${AppKeyPrefix}/${shortKey}`
+    sessionStorage.setItem(key, value)
 }
-
-export function getState(): string | null {
-    const key = `${AppKeyPrefix}/sys/state`
-    const state = sessionStorage.getItem(key)
+export function getValue(shortKey: string): string | null {
+    const key = `${AppKeyPrefix}/${shortKey}`
+    const value = sessionStorage.getItem(key)
     sessionStorage.removeItem(key)
-    return state
+    return value
 }
 
-export function saveFrom(from: string) {
-    const key = `${AppKeyPrefix}/sys/from`
-    sessionStorage.setItem(key, from)
-}
+// export function saveState(state: string) {
+//     const key = `${AppKeyPrefix}/sys/state`
+//     sessionStorage.setItem(key, state)
+// }
 
-export function getFrom(): string | null {
-    const key = `${AppKeyPrefix}/sys/from`
+// export function getState(): string | null {
+//     const key = `${AppKeyPrefix}/sys/state`
+//     const state = sessionStorage.getItem(key)
+//     sessionStorage.removeItem(key)
+//     return state
+// }
 
-    const state = sessionStorage.getItem(key)
-    sessionStorage.removeItem(key)
-    return state
-}
+// export function saveFrom(from: string) {
+//     const key = `${AppKeyPrefix}/sys/from`
+//     sessionStorage.setItem(key, from)
+// }
+
+// export function getFrom(): string | null {
+//     const key = `${AppKeyPrefix}/sys/from`
+
+//     const state = sessionStorage.getItem(key)
+//     sessionStorage.removeItem(key)
+//     return state
+// }
 
 // export function saveState(state: string,corpId?:string, agentId?: number, ){
 //     const corpId2 = corpId || 'NoCorpId'

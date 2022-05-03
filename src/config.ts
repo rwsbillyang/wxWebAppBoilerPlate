@@ -9,7 +9,7 @@
  export const TextCancel = "取消"
  export const TextBack = "返回"
 
- export const hasNavBar = () => false 
+ export const hasNavBar = () => true 
 
 
  export const enableAgentConfig = false //企业微信是否注入agentConfig
@@ -22,7 +22,5 @@
  export const Version = "1.0"
  export const AppKeyPrefix = "/wxWebapp"  
 
- //wx0f92cbee09e231f9 : youke
- export const AppId = "wx0f92cbee09e231f9"
 
  export const Host =  window.location.protocol + "//" + window.location.host // window.location.protocol: https:

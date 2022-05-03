@@ -1,5 +1,4 @@
 import { AppKeyPrefix, DEBUG } from "@/config"
-import { getItem, saveItem } from "@/request/useCache"
 import { f7 } from "framework7-react"
 import { CorpParams } from "./AuthData"
 
@@ -10,10 +9,10 @@ export const WebAppHelper = {
     //将入口页url参数保存到session中，关闭后丢失，重新打开时重新设置
     setCorpParams(params: CorpParams) {
         const str = JSON.stringify(params)
-        saveItem(`${AppKeyPrefix}/corpParams`, str)
+        sessionStorage.setItem(`${AppKeyPrefix}/corpParams`, str)
     },
     getCorpParams(): CorpParams | undefined {
-        const p = getItem(`${AppKeyPrefix}/corpParams`)
+        const p = sessionStorage.getItem(`${AppKeyPrefix}/corpParams`)
         if (p) return JSON.parse(p)
         else return undefined
     },
@@ -25,7 +24,7 @@ export const WebAppHelper = {
         if(DEBUG) console.log("no corpId or agentId, isWxWorkApp return false")
         return false //公众号模式
     },
-    getKeyPrefix(): string{
+    getKeyPrefix(): string{ //主要用于localStorage存储空间的区分，sessionStorage不需要，因为关闭后再打开数据就没了
         if(DEBUG) console.log("getKeyPrefix call getCorpParams")
         const p = WebAppHelper.getCorpParams()
         const corpId_ = p?.corpId || p?.appId || p?.suiteId || 'nocorp'

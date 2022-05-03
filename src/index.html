@@ -9,10 +9,10 @@
 
   <meta name="theme-color" content="#fff">
   <meta name="color-scheme" content="light dark">
-  <meta name="referrer" content="origin-when-cross-origin" />
+  <meta name="referrer" content="no-referrer-when-downgrade" />
   <meta name="format-detection" content="telephone=no">
   <meta name="msapplication-tap-highlight" content="no">
-  <title>WxWebAppBoilerplate</title>
+  <title></title>
   
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -20,7 +20,8 @@
   <link rel="icon" href="/icons/favicon.png">
   
    
-  <!-- <script src="//cdn.bootcdn.net/ajax/libs/vConsole/3.9.1/vconsole.min.js" type="text/javascript"></script>
+<!--    
+  <script src="//cdn.bootcdn.net/ajax/libs/vConsole/3.9.1/vconsole.min.js" type="text/javascript"></script>
   <script>
     var vConsole = new VConsole();
   </script> -->
@@ -57,6 +58,15 @@
       script.src = url;
       document.getElementsByTagName('head')[0].appendChild(script);
     }
+  
+    function getQueryString(name) {
+    let reg = new RegExp("(^|&)" + name + "=([^&]*)(&|$)", "i");
+    let r = window.location.search.substr(1).match(reg);
+    if (r != null) {
+        return decodeURIComponent(r[2]);
+    };
+    return null;
+    }
 
     var protocol = window.location.protocol
     if (isWeixinBrowser()) {
@@ -70,10 +80,10 @@
       console.log("not in wx")
     }
 
-    //vconsole
-    if(localStorage.getItem("vconsoleEnabled") === "1"){
-      loadJS(protocol + "//cdn.bootcdn.net/ajax/libs/vConsole/3.9.1/vconsole.min.js",function(){var vConsole = new VConsole();})
-    }
+    //vconsole //cdn.bootcdn.net/ajax/libs/vConsole/3.11.2/vconsole.min.js
+    //https://cdn.jsdelivr.net/npm/vconsole@latest/dist/vconsole.min.js
+    if(localStorage.getItem("vconsoleEnabled") === "1" || getQueryString("vconsole") == '1')
+      loadJS(protocol + "//cdn.jsdelivr.net/npm/vconsole@latest/dist/vconsole.min.js",function(){var vConsole = new VConsole();})
   </script>
 </body>
 </html>

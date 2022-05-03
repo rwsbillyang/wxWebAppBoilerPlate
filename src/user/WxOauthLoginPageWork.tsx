@@ -1,9 +1,10 @@
 import React, { useEffect } from 'react';
 import { Page, f7, Block } from 'framework7-react';
 import { getWithouAuth } from '@/request/myRequest';
-import { CorpParams, OAuthInfo } from './AuthData';
-import { saveFrom, saveState } from './WxOauthHelper';
+import { CorpParams, LoginParam, OAuthInfo } from './AuthData';
 import { DEBUG } from '@/config';
+import { saveValue } from './WxOauthHelper';
+import { WebAppHelper } from './WebAppHelper';
 
 
 
@@ -15,7 +16,7 @@ import { DEBUG } from '@/config';
  * 
  * 下一步将执行到wxOAuthNotifyxx.tsx
  */
-const WxOauthLoginPageWork = (props) => {
+const WxOauthLoginPageWork: React.FC<LoginParam> = (props: LoginParam) => {
 
     //对于RoutableTab，无pageInit等page事件
     const pageInit = () => {
@@ -31,8 +32,9 @@ const WxOauthLoginPageWork = (props) => {
         //- 第三方多应用：`/api/wx/work/oauth/info?suiteId=${suiteId}`
         //为了提高前端兼容性，支持多应用、内建应用、第三方应用，将从from中遍历获取各个参数，传递给后端
         //故：故配置的入口页url中需要有正确的参数
-        const query: any =  f7.utils.parseUrlQuery(props.from);
-        const param: CorpParams = {appId: query?.appId, corpId: query?.corpId, agentId:query?.agentId}
+        //const query: any =  f7.utils.parseUrlQuery(props.from);
+        const corpsParam = WebAppHelper.getCorpParams()
+        const param: CorpParams = {...corpsParam, appId: corpsParam?.appId || props.appId}
 
 
         getWithouAuth('/api/wx/work/oauth/info?scope=1', param)
@@ -40,11 +42,13 @@ const WxOauthLoginPageWork = (props) => {
                 f7.dialog.close()
                 const oauthInfo: OAuthInfo = res.data
 
-                saveState(oauthInfo.state)
+                saveValue("state" ,oauthInfo.state)
 
                 //const from = f7.views.main.router.currentRoute.query["from"]
-                
-                if (from) saveFrom(from)
+                const authStorageType = props.authStorageType
+                if(authStorageType !== undefined) saveValue("authStorageType", authStorageType.toString())
+
+                if (from) saveValue("from",from)
                 if(DEBUG) console.log("reidreact authorizeUrl="+oauthInfo.authorizeUrl)
                 window.location.href = oauthInfo.authorizeUrl
             })

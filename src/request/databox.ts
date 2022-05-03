@@ -5,10 +5,11 @@
  * 
  */
  export interface UmiListPagination{
-    pageSize: number;
-    current: number;
+    pageSize?: number;
+    current?: number;
     sKey?: string; //sortKey
-    sort: number; //1用于升序，而-1用于降序
+    sKeyType?: "TypeObjectId" | "TypeString" | "TypeNumber"; //排序的健不一定都是ObjectID类型，亦即lastId的后端类型，有可能是number或string类型，后端定义了三种类型：  TypeNumber  TypeString TypeObjectId
+    sort?: number; //1用于升序，而-1用于降序
     fKey?: string; //filter key
     filters?: string[]
 }

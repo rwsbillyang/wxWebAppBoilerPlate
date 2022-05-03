@@ -1,4 +1,6 @@
 
+import { ItemBase } from "@/components/f7ListKit/data";
+import { WebAppHelper } from "@/user/WebAppHelper";
 import { f7 } from "framework7-react"
 import { useEffect, useState } from "react";
 import { CODE, DataBox, encodeUmi, getDataFromBox, UmiListPagination } from "./databox"
@@ -13,9 +15,13 @@ const DebugCache = false
 export interface ListQueryBase {
     pagination?: UmiListPagination
     umi?: string,
-    keyword?: string,
     lastId?: string
   }
+
+//支持通过应用（appId）区分列表数据 
+export interface ListQueryForApp extends ListQueryBase {
+    appId: string
+}
 
 /**
  * 只显示loading普通的请求，不进行cache
@@ -44,7 +50,7 @@ export function fetchDiscachely<T>(
         onNoData,
         (msg) => {
             if (onFail) onFail(msg);
-            f7.toast.show({ text: msg })
+            else f7.toast.show({ text: msg })
         },
         showLoader,
         hideLoader
@@ -86,7 +92,7 @@ export function fetchCachely<T>(
         onNoData,
         (msg: string) => {
             if (onFail) onFail(msg);
-            f7.toast.show({ text: msg })
+            else f7.toast.show({ text: msg })
         },
         onLoading,
         hideLoading
@@ -137,8 +143,8 @@ export function genericFetchCachely<T>(
         .then(res => {
             if (hideLoading) hideLoading()
             const box: DataBox<T> = res.data
-            const data = getDataFromBox(box)
             if (box.code === CODE.OK) {
+            const data = getDataFromBox(box)
                 if(data === undefined){ //if(0)返回false if(data)判断有问题
                     if (onNoData) onNoData()
                 }else{ 
@@ -207,8 +213,8 @@ export function fetchListCachely<T>(
             .then(res => {
                 hideLoading()
                 const box: DataBox<T[]> = res.data
-                const data = getDataFromBox(box)
                 if (box.code === CODE.OK) {
+                const data = getDataFromBox(box)
                     if (data) {
                         onOK(data)
                         
@@ -280,64 +286,62 @@ export function fetchListCachely<T>(
  * 
  *  集成了isLoading, isError, errMsg, list, loadMoreState, setSkipCache（loadMore时需要设置跳过cache）, setQuery(导致重新请求)
  * 
- * 需要从远程加载的情况：点击loadMore按钮（每次加载完毕合并旧数据后缓存全部）、搜索（不缓存结果）、
- * 调用者认为需要强制刷新(不合并结果，只缓存结果)的情景比如下拉刷新,通过fetchDataFromRemote直接请求，并给其一个回调
+ * 需要从远程加载的情况：下拉刷新(不合并结果，只缓存结果)、点击loadMore按钮加载更多（每次加载完毕合并旧数据后缓存全部），只有loadMore时需要合并数据结果
+ * 每次从远程加载后，将开关设置回：isUseCache = true
  * 
- * 需要从本地加载的情况：首次进入、再次进入，清除搜索条件后恢复原状，tab切换（相当于新进入），都先从缓存加载，为空时再从远程加载
- * 
- * bug：首次进入，从cache中加载，无数据，继续从远程加载，加载后设置跳过cache，故再点击加载更多工作正常；
- * 但再次进入时，仍首先从cache中加载，cache中有数据，直接返回，再点击加载更多，依然从cache中加载一遍，数据是旧数据，显示的是旧数据，因此无法加载更多数据。
- * fix：所有查询条件继承自ListQueryBase，当有lastId字段时表示加载更多，当有keword时表示搜索；不提供setIsSearching,setSkipCache等函数进行设置。
- * 后端需要统一为接受lastId和keyword字段
-
+ * 需要从本地加载的情况：其它情况均尝试从缓存加载，包括但不限于：首次进入、页面返回再次进入，tab切换（相当于新进入），都先从缓存加载，为空时再从远程加载
+ *
  * @param listKey 不传递key则不使用cache
  * @param url 请求数据url
  * @param queryParams 列表查询条件
  * @param needLoadMore //分页数据为true，全部数据为false 用于查询全部数据的情况
  * @param storageType 缓存类型 default: sessionStorage
  */
-export function useCacheList<T, P extends ListQueryBase>(
+export function useCacheList<T, Q extends ListQueryBase>(
     listKey: string,
     url: string,
-    queryParams?: P,
+    initalQuery?: Q,
     needLoadMore: boolean = true, //分页数据为true，全部数据为false
     storageType: number = StorageType.OnlySessionStorage
 ) {
     const [list, setList] = useState<T[]>();
-    const [query, setQuery] = useState<P|undefined>(queryParams) //请求查询条件变化将导致重新请求
+    const [query, setQuery] = useState<Q>({ ...initalQuery } as Q) //请求查询条件变化将导致重新请求
     const [isLoading, setIsLoading] = useState(true); //加载状态
     const [isError, setIsError] = useState(false); //加载是否有错误
     const [errMsg, setErrMsg] = useState<string>() //加载错误信息
     const [loadMoreState, setLoadMoreState] = useState(getLoadMoreState(listKey)) //加载更多 按钮状态：可用和不可用，自动被管理，无需调用者管理
-    const [refresh, setRefresh] = useState<number>() //refresh只要改变就会引起获取值的操作。当为0时表示从远程获取，其它值则从本地获取
 
-    const [currentPage, setCurrentPage] = useState(1)
+    const [useCache, setUseCache] = useState(true)//从远程加载后即恢复为初始值true，以后即从本地加载，需要远程加载时再设置：setUseCache(false)
+    const [isLoadMore, setIsLoadMore] = useState(false)
+
+    const [refresh, setRefresh] = useState<number>(0) //refresh用于刷新本地list数据, setQuery也能达到同样效果，但往往用于从远程加载
+    // const [currentPage, setCurrentPage] = useState(1)
 
     //从远程加载数据，会动态更新加载状态、是否有错误、错误信息
     //加载完毕后，更新list，自动缓存数据（与现有list合并）、设置加载按钮状态
-    const fetchDataFromRemote = (query?: P, onDone?:(data?: T[])=>void, isMergeResult: boolean = false) => {
-        if(DebugCache) console.log("fetch from remote...for key="+listKey)
+    const fetchDataFromRemote = (query?: Q, onDone?: (data?: T[]) => void) => {
+        if (DebugCache) console.log("fetch from remote...for key=" + listKey + ", query=" + JSON.stringify(query))
         
-        get(url,  query?.pagination? {...query, umi: encodeUmi({...query.pagination, current: currentPage}), pagination: undefined} : query)
+        get(url, query?.pagination ? { ...query, umi: encodeUmi({ ...query.pagination }), sort: undefined, pagination: undefined } : { ...query, sort: undefined })
             .then(res => {
                 setIsLoading(false)
+                setUseCache(true)
+
+
                 const box: DataBox<T[]> = res.data
                 const data = getDataFromBox(box)
                 if (box.code === CODE.OK) {
                     if (data) {
                         setIsError(false)
 
-                        const result = (isMergeResult && list && list.length > 0) ? list.concat(data) : data
+                        const result = (isLoadMore && list && list.length > 0) ? list.concat(data) : data
                         setList(result)
-                        if(!query?.keyword){ //非搜索，缓存搜索结果
-                            saveItem(listKey, JSON.stringify(result), storageType)
-                        }
+                            saveItem(listKey, JSON.stringify(result), storageType)                     
 
                         if(needLoadMore){
-                            const newState = data.length >= PageSize
+                            const newState = data.length >= (query?.pagination?.pageSize || PageSize)
                             setLoadMoreState(newState)
                             saveLoadMoreState(listKey, newState)
-                            //setSkipCache(true) //一旦有过请求数据，再请求(加载更多)就跳过cache，除非点击tab重置了
                         }
                         
                     } else {
@@ -345,15 +349,14 @@ export function useCacheList<T, P extends ListQueryBase>(
                         if(needLoadMore){
                             setErrMsg("没有数据了")
                             saveLoadMoreState(listKey, false)
-                            setLoadMoreState(false)
                         }
                         
                     }
                 } else {
                     setIsError(true)
                     if(needLoadMore){
-                        saveLoadMoreState(listKey, false)
                         setLoadMoreState(false)
+                        saveLoadMoreState(listKey, false)
                     }
                     setErrMsg(box.msg || box.code)
                     
@@ -361,8 +364,14 @@ export function useCacheList<T, P extends ListQueryBase>(
 
                 //报告数据请求结束
                 if(onDone) onDone(data)
+
+
+                setIsLoadMore(false)//恢复普通状态，每次loadMore时再设置
             })
             .catch(err => {
+                setUseCache(true)
+
+
                 //报告数据请求结束
                 if(onDone) onDone()
 
@@ -373,31 +382,33 @@ export function useCacheList<T, P extends ListQueryBase>(
                     saveLoadMoreState(listKey, false)
                     setLoadMoreState(false)
                 } 
+
+                setIsLoadMore(false)//恢复普通状态，每次loadMore时再设置
             })
     }
 
     useEffect(() => {
-        if(DebugCache) console.log("in useEffect loading: currentPage="+currentPage+", refresh="+refresh+", url="+url+", query="+JSON.stringify(query))
-        //setList(undefined) 应由调用者重置list，因为在加载更多时，不能重置list；调用者判断是正常加载还是加载更多，决定是否重置list
+        if (DebugCache) console.log("in useEffect loading, url=" + url + ", query=" + JSON.stringify(query))
         setIsLoading(true)
-        if(query?.lastId || query?.keyword || refresh == 1 || currentPage > 1){ //首次搜索不合并结果
-            if(DebugCache) console.log("lastId or keyword or refresh, or currentPage > 1 , try from remote...")
-            fetchDataFromRemote(query, undefined, !!query?.lastId || currentPage > 1)//只有加载更多需合并结果，无论是否在搜索
-        }else{
+        if (useCache) {
             const v = getItem(listKey, storageType)
             if (v) {
-                if(DebugCache) console.log("fetch from local cache...,refresh="+refresh+", key="+listKey)
+                if (DebugCache) console.log("fetch from local cache... key=" + listKey)
                 setList(JSON.parse(v))
                 setIsLoading(false)
+                setLoadMoreState(getLoadMoreState(listKey)) //从缓存加载了数据，也对应加载其loadMore状态
             } else {
                 if(DebugCache) console.log("no local cache, try from remote...")
-                fetchDataFromRemote(query)//无缓存时合并和不合并没有意义，干脆不合并
+                fetchDataFromRemote(query)//无缓存时从远程加载
             }
+        } else {
+            if (DebugCache) console.log("useCache=false, try from remote...")
+            fetchDataFromRemote(query)
         } 
      
-    }, [url, query, refresh, currentPage])// url, query, refresh变化，导致重新请求. refresh值变化导致重新取数据
+    }, [url, query, refresh])// url, query, refresh变化
 
-    return { isLoading, isError, errMsg, loadMoreState, query, setQuery, list, setList, fetchDataFromRemote, refresh, setRefresh, currentPage, setCurrentPage}
+    return { isLoading, isError, errMsg, loadMoreState, query, setQuery, list, setList, fetchDataFromRemote, refresh, setRefresh, setUseCache, setIsLoadMore }
 }
 
 
@@ -407,20 +418,25 @@ export function useCacheList<T, P extends ListQueryBase>(
  * 获取sessionStorage中缓存的loadMore状态
  * @param key 列表的缓存key，后面会自动加'/loadMore'
  */
-function getLoadMoreState(listKey: string) {
-    const key = listKey + '/loadMore'
+function getLoadMoreState(shortKey: string) {
+    const key = WebAppHelper.getKeyPrefix() + shortKey + '/loadMore'
     const cached = sessionStorage.getItem(key)
 
     return (cached && cached === '0') ? false : true
 }
-function saveLoadMoreState(listKey: string, state: boolean) {
-    const key = listKey + '/loadMore'
+function saveLoadMoreState(shortKey: string, state: boolean) {
+    const key = WebAppHelper.getKeyPrefix() + shortKey + '/loadMore'
     sessionStorage.setItem(key, state ? '1' : '0')
 }
 
 
-export function getItem(key: string, storageType: number = StorageType.OnlySessionStorage,  defaultValue?: string) {
+export function getItem(shortKey: string, storageType: number = StorageType.OnlySessionStorage, defaultValue?: string) {
+
+    if (storageType === StorageType.NONE)
+        return defaultValue
+
     let v: string | null | undefined = undefined
+    const key = WebAppHelper.getKeyPrefix() + shortKey
     if (storageType === StorageType.OnlySessionStorage) {
         v = sessionStorage.getItem(key)
     } else if (storageType === StorageType.OnlyLocalStorage) {
@@ -437,7 +453,10 @@ export function getItem(key: string, storageType: number = StorageType.OnlySessi
     return v || defaultValue
 }
 
-export function saveItem(key: string, v: string, storageType: number = StorageType.OnlySessionStorage) {
+export function saveItem(shortKey: string, v: string, storageType: number = StorageType.OnlySessionStorage) {
+    if (storageType === StorageType.NONE)
+        return
+    const key = WebAppHelper.getKeyPrefix() + shortKey
     if (storageType === StorageType.OnlySessionStorage) {
         sessionStorage.setItem(key, v)
     } else if (storageType === StorageType.OnlyLocalStorage) {
@@ -450,7 +469,8 @@ export function saveItem(key: string, v: string, storageType: number = StorageTy
 }
 
 
-export const evictCache = (key: string, storageType: number = StorageType.OnlySessionStorage) => {
+export const evictCache = (shortKey: string, storageType: number = StorageType.OnlySessionStorage) => {
+    const key = WebAppHelper.getKeyPrefix() + shortKey
     if (storageType === StorageType.OnlySessionStorage) {
         sessionStorage.removeItem(key)
     } else if (storageType === StorageType.OnlyLocalStorage) {
@@ -475,56 +495,131 @@ export const evictAllCaches = (storageType: number = StorageType.OnlySessionStor
 
 
 //修改列表数据缓存，当新增一个
-export function onAddOne<T>(key: string, e: T,  storageType: number = StorageType.OnlySessionStorage){
-    const str = getItem(key)
+export function onAddOne<T>(shortKey: string, e: T, storageType: number = StorageType.OnlySessionStorage) {
+    if (storageType === StorageType.NONE)
+        return
+
+
+    const str = getItem(shortKey, storageType)
     if (str) {
         const arry: T[] = JSON.parse(str)
         if (arry && arry.length > 0){
             arry.unshift(e)
-            saveItem(key, JSON.stringify(arry))
+            saveItem(shortKey, JSON.stringify(arry))
         }else
-            saveItem(key, JSON.stringify([e]))
+            saveItem(shortKey, JSON.stringify([e]))
     } else
-        saveItem(key, JSON.stringify([e]))
+        saveItem(shortKey, JSON.stringify([e]))
 
+    console.log("onAddOne done")
 }
 
 /**
  * 编辑后修改缓存, 必须以_id作为键值进行比较
  */
- export function onEditOne<T> (key: string, e: T ) {
-    const str = getItem(key)
+export function onEditOne<T extends ItemBase>(shortKey: string, e: T, storageType: number = StorageType.OnlySessionStorage) {
+    if (storageType === StorageType.NONE)
+        return
+
+    const str = getItem(shortKey, storageType)
     if (str) {
         let arry: T[] = JSON.parse(str)
         if (arry && arry.length > 0) {
             //搜索现有列表，找到后更新
             for (let i = 0; i < arry.length; i++) {
                 if (arry[i]["_id"] === e["_id"]) {
-                    console.log("update one: id=" + e["id"])
+                    console.log("onEditOne : _id=" + e["_id"] + ", shortKey=" + shortKey)
                     arry[i] = e
-                    break;
+                    saveItem(shortKey, JSON.stringify(arry))
+                    return;
                 }
             }
-            saveItem(key, JSON.stringify(arry))
+            console.log("onEditOne：not found in list _id=" + e["_id"] + ", shortKey=" + shortKey)
+            return
         }
     }
+    console.log("onEditOne：not found list: shortKey=" + shortKey)
+}
+
+//批量修改后的缓存更新
+export function onEditMany<T extends ItemBase>(shortKey: string, list: T[], storageType: number = StorageType.OnlySessionStorage) {
+    if (storageType === StorageType.NONE)
+        return
+
+    const str = getItem(shortKey, storageType)
+    if (str) {
+        let arry: T[] = JSON.parse(str)
+        if (arry && arry.length > 0) {
+            for (let j = 0; j < list.length; j++) {
+                const e = list[j]
+                //搜索现有列表，找到后更新
+                for (let i = 0; i < arry.length; i++) {
+                    if (arry[i]["_id"] === e["_id"]) {
+                        arry[i] = e
+                    }
+                }
+            }
+            saveItem(shortKey, JSON.stringify(arry))
+            return
+        }else{
+            saveItem(shortKey, JSON.stringify(list))
+            return
+        }
+    }
+    console.log("onEditMany: not found list, shortKey=" + shortKey)
+}
+
+export function ids2Data<T extends ItemBase> (ids: string[], list: T[]){
+    const arry: T[] =  []
+    for(let j=0;j<ids.length;j++){
+        for (let i = 0; i < list.length; i++) {
+            const e = list[i]
+            if (e["_id"] === ids[j]) {
+                 arry.push(e)
+            }
+        }
+    }
+    return arry   
+}
+
+export function findOneFromCache<T extends ItemBase>(shortKey: string, _id: string, storageType: number = StorageType.OnlySessionStorage) {
+    if (storageType === StorageType.NONE)
+        return undefined
+
+    const str = getItem(shortKey, storageType)
+    if (str) {
+        let arry: T[] = JSON.parse(str)
+        if (arry && arry.length > 0) {
+            //搜索现有列表，找到后更新
+            for (let i = 0; i < arry.length; i++) {
+                if (arry[i]["_id"] === _id) {
+                    //console.log("update one: id=" + _id)
+                    return arry[i]
+                }
+            }
+        }
+    }
+    return undefined
 }
 
 
 /**
  * 编辑后修改缓存, 必须以_id作为键值进行比较
  */
- export function onDelOne<T>(key: string, _id: string) {
-    const str = getItem(key)
+export function onDelOne<T>(shortKey: string, _id: string, storageType: number = StorageType.OnlySessionStorage) {
+    if (storageType === StorageType.NONE)
+        return undefined
+
+    const str = getItem(shortKey)
     if (str) {
         let arry: T[] = JSON.parse(str)
         if (arry && arry.length > 0) {
             //搜索现有列表，找到后删除
             for (let i = 0; i < arry.length; i++) {
                 if (arry[i]["_id"] === _id) {
-                    console.log("del one: id=" + _id)
+                    console.log("del one: _id=" + _id)
                     arry.splice(i, 1)
-                    saveItem(key, JSON.stringify(arry))
+                    saveItem(shortKey, JSON.stringify(arry))
                     return arry;
                 }
             }

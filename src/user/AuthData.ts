@@ -1,7 +1,4 @@
-import { CODE, DataBox, getDataFromBox } from "@/request/databox"
-import { postWithouAuth } from "@/request/myRequest"
-import { f7 } from "framework7-react"
-import { WxAuthHelper } from "./WxOauthHelper"
+
 
 /**
  * 用于从url中提取路径中的参数，oauth认证时，需要知道是哪个公众号，
@@ -25,8 +22,19 @@ import { WxAuthHelper } from "./WxOauthHelper"
     from?: string
     needUserInfo?: boolean //oauth时用到，用于是否获取用户信息。false  明确不需要；true：明确需要；空：根据用户设置综合确定
     owner?: string // 用于判断用户设置是否获取用户信息
-    silentLogin?: boolean //是否最新登录，有时候还需要使用最新的登录信息（与session同生命周期），若不是最新登录则静默登录一次
+    //silentLogin?: boolean //是否最新登录，有时候还需要使用最新的登录信息（与session同生命周期），若不是最新登录则静默登录一次
+    authStorageType?: number 
   }
+
+  //登录类型，与后端保持一致
+  export const LoginType = {
+    ACCOUNT: "account", //账户密码
+    MOBILE: "mobile", // 验证码，暂不支持
+    WECHAT: "wechat", //微信登录
+    WXWORK: "wxWork", //企业微信登录
+    SCAN_QRCODE: "scanQrcode" //扫码或企业微信扫码登录，根据指定的参数appId/corpId&agentId
+  }
+  
   
 
   export interface OAuthInfo {
@@ -66,45 +74,8 @@ export interface AuthBean extends GuestOAuthBean{
     nick?: string,
     qrCode?: string  
     ext?: string //扩展字段，如推广模式：个人品牌，产品广告等
+
+    miniId?: string //小程序 appId
+    gId?: string[] //所属群组
 }
 
-
-/**
- * 适用于公众号登录
- * 各种需要登录的地方，需求可能有所区别，提取于此，都用到它
- * 本来不需要每次进入都登录，只不过收到奖励后需要更新，才每次都获取最新值，同时后端可对token进行检查
- */
- export function login(openId: string,  
-    onOK: ()=> void, 
-    onNewUser:() => void,
-    onFail:(msg: string) => void,
-    unionId?: string
-){
-    f7.dialog.preloader('登录中...')
-    postWithouAuth(`/api/wx/oa/account/login`, { name: openId, pwd: unionId, type: "wechat" })
-    .then(function (res) {
-        f7.dialog.close()
-        const box: DataBox<AuthBean> = res.data
-        if (box.code == CODE.OK) {
-            const authBean = getDataFromBox(box)
-            if (authBean) {
-                WxAuthHelper.onAuthenticated(authBean)
-                onOK()
-            } else {
-                console.log(box.msg)
-                onFail("no data")
-            }
-        } else if (box.code == CODE.NewUser) {
-            onNewUser()
-        } else {
-            console.log(box.msg)
-            onFail(box.msg || "something wrong")
-        }
-    })
-    .catch(function (err) {
-        f7.dialog.close()
-        const msg_ = err.status + ": " + err.message
-        console.log(msg_)
-        onFail(msg_)
-    })
-}

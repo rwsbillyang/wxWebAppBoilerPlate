@@ -2,11 +2,54 @@ import React, { useState } from 'react';
 import { Page, Block, Link, f7 } from 'framework7-react';
 
 
-import { getFrom, getState, WxGuestAuthHelper } from './WxOauthHelper';
+import { getValue, WxGuestAuthHelper } from './WxOauthHelper';
 import { authorizeUrl } from './WxOauthLoginPageOA';
-import { GuestOAuthBean, login } from './AuthData';
-import { AppId } from '@/config';
+import { AuthBean, GuestOAuthBean, LoginType } from './AuthData';
+import { StorageType } from '@/request/useCache';
 
+import { CODE, DataBox, getDataFromBox } from "@/request/databox"
+import { postWithouAuth } from "@/request/myRequest"
+import { WxAuthHelper } from "./WxOauthHelper"
+
+/**
+ * 适用于公众号登录
+ * 各种需要登录的地方，需求可能有所区别，提取于此，都用到它
+ * 本来不需要每次进入都登录，只不过收到奖励后需要更新，才每次都获取最新值，同时后端可对token进行检查
+ */
+ export function login(openId: string,  
+    onOK: ()=> void, 
+    onNewUser:() => void,
+    onFail:(msg: string) => void, authStorageType: number,
+    unionId?: string, loginType: string = 'wechat'
+){
+    f7.dialog.preloader('登录中...')
+    postWithouAuth(`/api/wx/oa/account/login`, { name: openId, pwd: unionId, type: loginType })
+    .then(function (res) {
+        f7.dialog.close()
+        const box: DataBox<AuthBean> = res.data
+        if (box.code == CODE.OK) {
+            const authBean = getDataFromBox(box)
+            if (authBean) {
+                WxAuthHelper.onAuthenticated(authBean, authStorageType)
+                onOK()
+            } else {
+                console.log(box.msg)
+                onFail("no data")
+            }
+        } else if (box.code == CODE.NewUser) {
+            onNewUser()
+        } else {
+            console.log(box.msg)
+            onFail(box.msg || "something wrong")
+        }
+    })
+    .catch(function (err) {
+        f7.dialog.close()
+        const msg_ = err.status + ": " + err.message
+        console.log(msg_)
+        onFail(msg_)
+    })
+}
 
 /**
  * 接到后端通知后，出错则显示错误信息；正确则进行登录(若需admin)获取jwtToken，最后进行跳转
@@ -21,8 +64,8 @@ import { AppId } from '@/config';
 export default (props: any) => {
     const [msg, setMsg] = useState<string>()
 
-    const maybeLoginAndGoBack = (openId?: string) => {
-        const from = getFrom()
+    const maybeLoginAndGoBack = (storageType: number, openId?: string) => {
+        const from = getValue("from")
         console.log("from=" + from)
 
         if (!from) {
@@ -42,12 +85,18 @@ export default (props: any) => {
             f7.dialog.alert("微信登录出错了，请关闭后重新打开")
             return false
         }
+        
+        //是否扫码登录，是的话传递给后台，单独处理 WxScanQrcodeLoginConfirmPage中设置scanQrcodeId
+        const scanQrcodeId = getValue("scanQrcodeId")
+        const unionId = scanQrcodeId? scanQrcodeId : undefined
+        const type = scanQrcodeId? LoginType.SCAN_QRCODE : LoginType.WECHAT
+
         //必须是系统注册用户
         login(openId, 
             ()=> f7.views.main.router.navigate(from), 
             //()=> f7.views.main.router.navigate("/u/register", { props: { from } }),
             ()=>{ window.location.href = "/u/register?from="+from }, //使用router.navigate容易导致有的手机中注册页面中checkbox和a标签无法点击,原因不明
-            (msg)=> setMsg("登录失败：" + msg)
+            (msg)=> setMsg("登录失败：" + msg), storageType, unionId, type
             )
             
             return false
@@ -56,17 +105,22 @@ export default (props: any) => {
 
     const pageInit = () => {
         const query = props.f7route.query
-        const appId = query["appId"] || AppId
+        const appId = query["appId"] 
         const step = query["step"]
+        
+        //默认使用BothStorage
+        const authStorageType = +(getValue("authStorageType") || StorageType.BothStorage.toString())
+
+
         if(step === '1'){
-            const stateInSession = getState()
+            const stateInSession = getValue("state")
             const state = query["state"]
             if (state !== stateInSession) {
                 setMsg("页面可能已过期，可直接关闭")
                 console.warn("state=" + state + ", stateInSession=" + stateInSession)
                 return false
             }
-
+            // /#!/wxoa/authNotify?state=t5KPXOlJiw7t&step=1&appId=wx704f95ccd0255b91&code=OK&openId=ojqFl69faxuiE-Ij-An95FwV2_I4&needUserInfo=0
             //若在step1中，未能成功获取用户openid，则可直接进行step2进行弥补，不要提示出错信息
             const needUserInfo = query["needUserInfo"] || '1'
             if (needUserInfo === '1') {
@@ -87,12 +141,13 @@ export default (props: any) => {
                     return false
                 }
                 const guestAuthBean: GuestOAuthBean = {appId, openId1: openId }
-                WxGuestAuthHelper.onAuthenticated(guestAuthBean)
 
-                maybeLoginAndGoBack(openId)
+                WxGuestAuthHelper.onAuthenticated(guestAuthBean, authStorageType)
+
+                maybeLoginAndGoBack(authStorageType, openId)
             }
         }else if(step === '2'){
-            const stateInSession = getState()
+            const stateInSession = getValue("state")
             const state = query["state"]
             
             //保留该校验，目的在于回退时阻止继续进行下去
@@ -114,10 +169,10 @@ export default (props: any) => {
                 console.warn("缺少参数：openId")
             }else{
                 const guestAuthBean: GuestOAuthBean = {appId, openId1: openId, hasUserInfo: true}
-                WxGuestAuthHelper.onAuthenticated(guestAuthBean)
+                WxGuestAuthHelper.onAuthenticated(guestAuthBean, authStorageType)
             }
             
-            maybeLoginAndGoBack(openId)
+            maybeLoginAndGoBack(authStorageType, openId)
         }else{
             setMsg("parameter error: step="+step)
         }
